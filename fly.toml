@@ -1,5 +1,9 @@
 # fly.toml - Fly.io configuration for JabStack
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+# IMPORTANT: Before deploying, update the following:
+#   1. app - Your Fly.io app name
+#   2. PUBLIC_APP_URL - Your production URL
 
 app = 'jabstack'
 primary_region = 'iad'
@@ -19,9 +23,9 @@ primary_region = 'iad'
   processes = ['app']
 
 [[vm]]
-  memory = '1gb'
-  cpu_kind = 'shared'
+  memory = '512mb'
   cpus = 1
+  memory_mb = 512
 
 [env]
   NODE_ENV = 'production'
