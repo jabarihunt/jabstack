@@ -4,15 +4,15 @@ A modern, full-stack starter template for personal projects. Built with SvelteKi
 
 ## Features
 
-- ⚡ **Bun** - Fast JavaScript runtime and package manager
-- 🔥 **SvelteKit** - Full-stack web framework with SSR/SSG/SPA support
-- 🗄️ **Turso/SQLite** - LibSQL for production, SQLite for local development
-- 🔐 **Better Auth** - Modern authentication with Google OAuth
-- 💳 **Stripe** - Payment processing for subscriptions
-- 📧 **Resend** - Transactional email service
-- 🎨 **shadcn-svelte** - Beautiful UI components for dashboard
-- 🧩 **Bits UI** - Headless components for marketing pages
-- 🚀 **Fly.io** - Edge deployment with Docker
+- **Bun** - Fast JavaScript runtime and package manager
+- **SvelteKit** - Full-stack web framework with SSR/SSG/SPA support
+- **Turso/SQLite** - LibSQL for production, SQLite for local development
+- **Better Auth** - Modern authentication with Google OAuth
+- **Stripe** - Payment processing for subscriptions
+- **Resend** - Transactional email service
+- **shadcn-svelte** - Beautiful UI components for dashboard
+- **Bits UI** - Headless components for marketing pages
+- **Fly.io** - Edge deployment with Docker
 
 ## Quick Start
 
