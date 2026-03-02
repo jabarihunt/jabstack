@@ -143,6 +143,13 @@ turso db tokens create jabstack
 
 ### Fly.io
 
+Before deploying, update `PUBLIC_APP_URL` in `fly.toml` to your production URL:
+
+```toml
+[build.args]
+  PUBLIC_APP_URL = "https://your-app.fly.dev"
+```
+
 ```bash
 # Create app
 fly apps create jabstack

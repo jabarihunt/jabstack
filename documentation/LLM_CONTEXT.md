@@ -125,7 +125,14 @@ bun run stripe:cli   # Forward Stripe webhooks to localhost
 
 ## Deployment
 
-Deployed to Fly.io using Bun-based Docker image:
+Deployed to Fly.io using Bun-based Docker image.
+
+Before deploying, update `PUBLIC_APP_URL` in `fly.toml` to your production URL:
+
+```toml
+[build.args]
+  PUBLIC_APP_URL = "https://your-app.fly.dev"
+```
 
 ```bash
 fly deploy           # Deploy to Fly.io

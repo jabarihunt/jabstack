@@ -6,6 +6,10 @@ primary_region = 'iad'
 
 [build]
 
+# IMPORTANT: Update PUBLIC_APP_URL to your production URL before deploying
+[build.args]
+  PUBLIC_APP_URL = "https://jabstack.fly.dev"
+
 [http_service]
   internal_port = 3000
   force_https = true
