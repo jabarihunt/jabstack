@@ -14,6 +14,14 @@
         "TURSO_DATABASE_URL": "${DATABASE_URL}",
         "TURSO_AUTH_TOKEN": "${DATABASE_AUTH_TOKEN}"
       }
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": ["shadcn@latest", "mcp"]
+    },
+    "svelte": {
+      "command": "npx",
+      "args": ["-y", "sv", "mcp"]
     }
   }
 }

@@ -162,6 +162,8 @@ JabStack includes MCP server configurations for AI-assisted development:
 
 - **Stripe MCP** - Query Stripe data, manage products/prices
 - **Turso MCP** - Query database, explore schema
+- **shadcn MCP** - Browse, search, and install shadcn-svelte components via natural language
+- **Svelte MCP** - Provides Svelte/SvelteKit documentation context and static analysis for better code generation
 
 See `.mcp/mcp.json` for configuration.
 
