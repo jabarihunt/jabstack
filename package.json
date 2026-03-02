@@ -3,6 +3,11 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "author": {
+    "name": "Jabari J. Hunt",
+    "email": "jabari@jabari.net",
+    "url": "https://www.linkedin.com/in/jabarihunt"
+  },
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
