@@ -1,0 +1,45 @@
+# JabStack - Cursor Rules
+
+You are working on JabStack, a SvelteKit starter template.
+
+## Read First
+- `documentation/LLM_CONTEXT.md` - Full project context
+- `plans/jabstack-architecture.md` - Architecture details
+
+## Stack
+- Runtime: Bun (not npm/yarn/pnpm)
+- Framework: SvelteKit + TypeScript
+- Database: Turso/SQLite + Drizzle ORM
+- Auth: Better Auth + Google OAuth
+- Payments: Stripe
+- Email: Resend
+- Hosting: Fly.io
+
+## Critical Rules
+
+### UI Libraries
+- Dashboard routes (`/dashboard/*`): Use shadcn-svelte from `$lib/components/ui/`
+- Marketing routes (all others): Use Bits UI from `$lib/components/marketing/`
+- NEVER mix these libraries
+
+### Environment Variables
+- Always import from `$env/static/private` or `$env/static/public`
+- Never use `process.env` directly
+- All vars validated in `src/lib/env.ts`
+
+### Server Code
+- Files in `src/lib/server/` are server-only
+- Database, auth, stripe, email configs live here
+- Never import server files in client components
+
+### Imports
+- Use `$lib/` alias for `src/lib/`
+- Use `cn()` from `$lib/utils.ts` for class merging
+
+## Commands
+```bash
+bun run dev          # Dev server
+bun run build        # Build
+bun run db:generate  # Generate migrations
+bun run db:migrate   # Apply migrations
+```
