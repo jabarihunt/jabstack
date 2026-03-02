@@ -120,6 +120,7 @@ bun run test         # Run Vitest tests
 bun run db:generate  # Generate Drizzle migrations
 bun run db:migrate   # Apply migrations
 bun run db:studio    # Open Drizzle Studio
+bun run stripe:cli   # Forward Stripe webhooks to localhost
 ```
 
 ## Deployment

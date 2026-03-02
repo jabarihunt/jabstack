@@ -20,6 +20,7 @@ A modern, full-stack starter template for personal projects. Built with SvelteKi
 
 - [Bun](https://bun.sh) installed
 - [Turso CLI](https://docs.turso.tech/cli/installation) (optional, for production database)
+- [Stripe CLI](https://docs.stripe.com/stripe-cli) (optional, for local webhook testing)
 - [Fly CLI](https://fly.io/docs/hands-on/install-flyctl/) (optional, for deployment)
 
 ### Installation
@@ -102,6 +103,7 @@ bun run test         # Run tests
 bun run db:generate  # Generate database migrations
 bun run db:migrate   # Apply migrations
 bun run db:studio    # Open Drizzle Studio
+bun run stripe:cli   # Forward Stripe webhooks to localhost
 ```
 
 ## UI Libraries
