@@ -14,7 +14,19 @@ A modern, full-stack starter template for personal projects. Built with SvelteKi
 - **Bits UI** - Headless components for marketing pages
 - **Fly.io** - Edge deployment with Docker
 
-## Quick Start
+## Quickstart
+
+```bash
+1. git clone https://github.com/yourusername/jabstack.git
+2. cd jabstack
+3. bun install
+4. cp .env.example .env
+5. bun run dev
+```
+
+The app runs at `http://localhost:5173` with SQLite out of the box. Auth and payments won't work until you configure the API keys in `.env`.
+
+## Full Setup
 
 ### Prerequisites
 
@@ -23,48 +35,19 @@ A modern, full-stack starter template for personal projects. Built with SvelteKi
 - [Stripe CLI](https://docs.stripe.com/stripe-cli) (optional, for local webhook testing)
 - [Fly CLI](https://fly.io/docs/hands-on/install-flyctl/) (optional, for deployment)
 
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/jabstack.git
-cd jabstack
-
-# Install dependencies
-bun install
-
-# Copy environment variables
-cp .env.example .env
-
-# Start development server
-bun run dev
-```
-
 ### Environment Variables
 
-Create a `.env` file with the following variables:
+The `.env.example` file has sensible defaults for local development. You'll need to configure:
 
-```bash
-# Database
-DATABASE_URL=file:local.db
-DATABASE_AUTH_TOKEN=
-
-# Authentication
-BETTER_AUTH_SECRET=your-secret-key-at-least-32-characters
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-
-# Stripe
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
-
-# Resend
-RESEND_API_KEY=re_...
-
-# Application
-PUBLIC_APP_URL=http://localhost:5173
-```
+| Variable | Required For | Get From |
+|----------|--------------|----------|
+| `BETTER_AUTH_SECRET` | Auth | `openssl rand -base64 32` |
+| `GOOGLE_CLIENT_ID` | Google OAuth | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
+| `STRIPE_SECRET_KEY` | Payments | [Stripe Dashboard](https://dashboard.stripe.com/apikeys) |
+| `STRIPE_WEBHOOK_SECRET` | Webhooks | `stripe listen --forward-to localhost:5173/api/stripe/webhook` |
+| `PUBLIC_STRIPE_PUBLISHABLE_KEY` | Payments | [Stripe Dashboard](https://dashboard.stripe.com/apikeys) |
+| `RESEND_API_KEY` | Email | [Resend Dashboard](https://resend.com/api-keys) |
 
 ## Project Structure
 
