@@ -51,14 +51,46 @@ Never access `process.env` directly. Always use the validated `env` export.
 - **Schema**: Defined in `src/lib/server/db/schema.ts`
 - **Migrations**: SQL files in `drizzle/`, committed to git. Generate with `bun run db:generate`, apply with `bun run db:migrate`. Fly.io applies them on deploy through `release_command` in `fly.toml`
 
-### 4. Authentication Flow
+### 4. Authentication
 
-Better Auth handles all auth. Key patterns:
+Better Auth handles sign-in, sessions and the OAuth callback. Google is the only sign-in method. Email and password sign-in is turned off in `src/lib/server/auth.ts`.
 
-- Auth API routes: `src/routes/api/auth/[...all]/+server.ts`
-- Session available via `locals.session` in server load functions
-- Protected routes use `+layout.server.ts` guards in `/dashboard/`
-- OAuth callback: `src/routes/auth/callback/+server.ts`
+**Routes**
+
+| Route | What it does |
+|-------|--------------|
+| `src/routes/api/auth/[...all]/+server.ts` | Passes every `/api/auth/*` request to Better Auth. Don't add other routes under `/api/auth/`. |
+| `POST /api/auth/sign-in/social` | Starts Google sign-in. Call it through the client, not directly. |
+| `GET /api/auth/callback/google` | Google sends users back here. Better Auth creates or updates the user and account, starts a session, sets the session cookie and redirects to `callbackURL`. Don't create your own callback route. |
+| `GET /api/auth/get-session` | Returns the current session, or `null`. |
+| `POST /api/auth/sign-out` | Ends the session. |
+| `src/routes/auth/login/+page.server.ts` | Placeholder for `/auth/login` that redirects to `/dashboard`. Each project replaces it with a real sign-in page. |
+
+**Client** (`src/lib/auth-client.ts`)
+
+```ts
+import { signIn, signOut, useSession } from '$lib/auth-client.js';
+
+signIn.social({ provider: 'google', callbackURL: '/dashboard' });
+signOut();
+const session = useSession(); // a store: $session.data is the session or null
+```
+
+**Server**
+
+There's no `src/hooks.server.ts`, so nothing puts the session on `event.locals`. Read it directly in a server `load` function or `+server.ts` endpoint:
+
+```ts
+import { auth } from '$lib/server/auth.js';
+
+const session = await auth.api.getSession({ headers: request.headers });
+```
+
+`/dashboard` has no auth guard yet. See "Protecting the Dashboard" below.
+
+**Google OAuth**
+
+Google only redirects to URIs listed on the OAuth client, so add `<PUBLIC_APP_URL>/api/auth/callback/google` in Google Cloud Console for each environment (for example `http://localhost:5173/api/auth/callback/google`). Better Auth uses `PUBLIC_APP_URL` as its base URL, so it must match the address the app is served from.
 
 ### 5. File Organization
 
@@ -75,9 +107,9 @@ src/
 │   └── types.ts          # Shared TypeScript types
 ├── routes/
 │   ├── +page.svelte      # Marketing home page
-│   ├── auth/             # Auth pages (login, register, callback)
-│   ├── dashboard/        # Protected dashboard area
-│   └── api/              # API routes (auth, webhooks)
+│   ├── auth/login/       # Sign-in placeholder (redirects to /dashboard)
+│   ├── dashboard/        # Dashboard area (no auth guard yet)
+│   └── api/auth/         # Better Auth handler for /api/auth/*
 ```
 
 ## Common Tasks
@@ -103,6 +135,42 @@ src/
 3. Apply migration: `bun run db:migrate`
 4. Commit the new files in `drizzle/` with the schema change
 5. Create type exports in `src/lib/types.ts` if needed
+
+### Adding Real Sign-In
+
+1. Delete `src/routes/auth/login/+page.server.ts` (the redirect placeholder)
+2. Create `src/routes/auth/login/+page.svelte`. It's a marketing route, so use Bits UI:
+
+```svelte
+<script lang="ts">
+	import { Button } from 'bits-ui';
+	import { signIn } from '$lib/auth-client.js';
+</script>
+
+<Button.Root onclick={() => signIn.social({ provider: 'google', callbackURL: '/dashboard' })}>
+	Sign in with Google
+</Button.Root>
+```
+
+3. Make sure the Google OAuth client lists the callback URL (see "Google OAuth" above)
+
+### Protecting the Dashboard
+
+Create `src/routes/dashboard/+layout.server.ts`:
+
+```ts
+import { redirect } from '@sveltejs/kit';
+import { auth } from '$lib/server/auth.js';
+import type { LayoutServerLoad } from './$types.js';
+
+export const load: LayoutServerLoad = async ({ request }) => {
+	const session = await auth.api.getSession({ headers: request.headers });
+	if (!session) redirect(307, '/auth/login');
+	return { user: session.user };
+};
+```
+
+Replace the `/auth/login` placeholder first. It redirects to `/dashboard`, so with the guard in place, signed-out users would bounce between the two pages.
 
 ### Adding a New API Endpoint
 

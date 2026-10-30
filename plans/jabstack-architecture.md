@@ -47,19 +47,16 @@ jabstack/
 │   │   └── types.ts                   # Shared TypeScript types
 │   ├── routes/
 │   │   ├── +layout.svelte             # Root layout
-│   │   ├── +layout.server.ts          # Root server layout - auth session
 │   │   ├── +page.svelte               # Marketing home page
 │   │   ├── auth/
-│   │   │   ├── login/+page.svelte     # Login page
-│   │   │   ├── register/+page.svelte  # Registration page
-│   │   │   └── callback/+server.ts    # OAuth callback handler
+│   │   │   └── login/+page.server.ts  # Sign-in placeholder (redirects to /dashboard)
 │   │   ├── dashboard/
 │   │   │   ├── +layout.svelte         # Dashboard layout with sidebar
-│   │   │   ├── +layout.server.ts      # Auth guard
+│   │   │   ├── +layout.server.ts      # Auth guard (added per project)
 │   │   │   ├── +page.svelte           # Main dashboard - dashboard-01
 │   │   │   └── settings/+page.svelte  # User settings
 │   │   ├── api/
-│   │   │   ├── auth/[...all]/+server.ts  # Better Auth API routes
+│   │   │   ├── auth/[...all]/+server.ts  # Better Auth handler for /api/auth/* (incl. Google callback)
 │   │   │   └── webhooks/
 │   │   │       └── stripe/+server.ts     # Stripe webhook handler
 │   │   └── [...catchall]/+page.svelte    # 404 page
@@ -147,15 +144,18 @@ sequenceDiagram
     participant E as Resend
 
     Note over U,E: Authentication Flow
-    U->>B: Click Sign In
-    B->>S: GET /auth/login
-    S->>A: Initiate OAuth
-    A->>G: Redirect to Google
-    G->>A: OAuth callback with code
-    A->>D: Create/update user
-    A->>E: Send welcome email
-    A->>B: Set session cookie
-    B->>U: Redirect to dashboard
+    Note over S,A: SvelteKit forwards /api/auth/* to Better Auth
+    U->>B: Click Sign in with Google
+    B->>A: POST /api/auth/sign-in/social
+    A->>D: Store OAuth state
+    A->>B: Google authorization URL
+    B->>G: Redirect to Google
+    G->>B: Redirect to /api/auth/callback/google with code
+    B->>A: GET /api/auth/callback/google
+    A->>G: Exchange code for tokens
+    A->>D: Create or update user and account, create session
+    A->>B: Set session cookie, redirect to callbackURL
+    B->>U: Show dashboard
 
     Note over U,E: Payment Flow
     U->>B: Subscribe to plan
@@ -168,14 +168,17 @@ sequenceDiagram
     S->>E: Send receipt email
 ```
 
+No email is sent on sign-up yet. To send one, call `sendWelcomeEmail` from `src/lib/server/email.ts` in Better Auth's `databaseHooks.user.create.after`.
+
 ## Database Schema
 
 ```mermaid
 erDiagram
     users {
         string id PK
-        string email UK
         string name
+        string email UK
+        boolean email_verified
         string image
         timestamp created_at
         timestamp updated_at
@@ -186,35 +189,58 @@ erDiagram
         string user_id FK
         string token UK
         timestamp expires_at
+        string ip_address
+        string user_agent
         timestamp created_at
+        timestamp updated_at
     }
 
     accounts {
         string id PK
         string user_id FK
-        string provider
-        string provider_account_id
+        string provider_id
+        string account_id
         string access_token
         string refresh_token
+        string id_token
+        timestamp access_token_expires_at
+        timestamp refresh_token_expires_at
+        string scope
+        string password
         timestamp created_at
+        timestamp updated_at
+    }
+
+    verifications {
+        string id PK
+        string identifier
+        string value
+        timestamp expires_at
+        timestamp created_at
+        timestamp updated_at
     }
 
     subscriptions {
         string id PK
         string user_id FK
         string stripe_customer_id
-        string stripe_subscription_id
+        string stripe_subscription_id UK
+        string stripe_price_id
         string status
         string plan
+        timestamp current_period_start
         timestamp current_period_end
+        boolean cancel_at_period_end
         timestamp created_at
         timestamp updated_at
     }
 
     users ||--o{ sessions : has
     users ||--o{ accounts : has
-    users ||--o| subscriptions : has
+    users ||--o{ subscriptions : has
 ```
+
+`users`, `sessions`, `accounts` and `verifications` are Better Auth's tables (`verifications` holds short-lived values such as OAuth state). Better Auth checks them against its expected schema at startup. Timestamps are stored as milliseconds.
 
 ## Environment Variables
 
@@ -308,21 +334,31 @@ export const db = drizzle(client);
 ### 4. Better Auth Configuration
 
 ```typescript
-// src/lib/server/auth.ts
+// src/lib/server/auth.ts (abridged)
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { db } from './db';
+import { db } from './db/index.js';
+import * as schema from './db/schema.js';
 
 export const auth = betterAuth({
-  database: drizzleAdapter(db),
+  database: drizzleAdapter(db, {
+    provider: 'sqlite',
+    schema,
+    usePlural: true // tables are users, sessions, accounts, verifications
+  }),
+  secret: BETTER_AUTH_SECRET,
+  baseURL: PUBLIC_APP_URL, // callback URLs are built from this
   socialProviders: {
     google: {
-      clientId: env.GOOGLE_CLIENT_ID,
-      clientSecret: env.GOOGLE_CLIENT_SECRET
+      clientId: GOOGLE_CLIENT_ID,
+      clientSecret: GOOGLE_CLIENT_SECRET
     }
-  }
+  },
+  emailAndPassword: { enabled: false }
 });
 ```
+
+The route `src/routes/api/auth/[...all]/+server.ts` passes every `/api/auth/*` request to `auth.handler`. Google redirects back to `/api/auth/callback/google`, so that URL (prefixed with `PUBLIC_APP_URL`) must be an authorized redirect URI on the Google OAuth client.
 
 ### 5. Dockerfile for Fly.io
 

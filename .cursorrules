@@ -32,6 +32,12 @@ You are working on JabStack, a SvelteKit starter template.
 - Database, auth, stripe, email configs live here
 - Never import server files in client components
 
+### Auth
+- Better Auth serves everything under `/api/auth/*` via `src/routes/api/auth/[...all]/+server.ts`, including the Google callback at `/api/auth/callback/google`
+- Never create custom OAuth or callback routes
+- `/auth/login` is a placeholder that redirects to `/dashboard`
+- On the server, read the session with `auth.api.getSession({ headers: request.headers })`
+
 ### Imports
 - Use `$lib/` alias for `src/lib/`
 - Use `cn()` from `$lib/utils.ts` for class merging

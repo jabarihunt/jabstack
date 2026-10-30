@@ -52,9 +52,17 @@ fly deploy           # Deploy to Fly.io
 src/lib/components/ui/        # shadcn-svelte (dashboard)
 src/lib/components/marketing/ # Bits UI (marketing)
 src/lib/server/               # Server-only (db, auth, stripe, email)
-src/routes/dashboard/         # Protected dashboard pages
+src/routes/dashboard/         # Dashboard pages (no auth guard yet)
+src/routes/auth/login/        # Sign-in placeholder (redirects to /dashboard)
+src/routes/api/auth/[...all]/ # Better Auth handler for /api/auth/*
 src/routes/                   # Marketing pages
 ```
+
+## Auth Routes
+
+- Better Auth serves everything under `/api/auth/*`, including the Google callback at `/api/auth/callback/google`. Don't create custom OAuth or callback routes.
+- Sign in from the client with `signIn.social({ provider: 'google', callbackURL: '/dashboard' })` from `$lib/auth-client.js`.
+- On the server, read the session with `auth.api.getSession({ headers: request.headers })`. There's no `hooks.server.ts`, so `locals` has no session.
 
 ---
 

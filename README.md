@@ -42,6 +42,7 @@ The `.env.example` file has sensible defaults for local development. You'll need
 
 | Variable | Required For | Get From |
 |----------|--------------|----------|
+| `PUBLIC_APP_URL` | Auth callbacks, email links | The URL you open the app at (`http://localhost:5173` locally) |
 | `BETTER_AUTH_SECRET` | Auth | `openssl rand -base64 32` |
 | `GOOGLE_CLIENT_ID` | Google OAuth | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
@@ -49,6 +50,14 @@ The `.env.example` file has sensible defaults for local development. You'll need
 | `STRIPE_WEBHOOK_SECRET` | Webhooks | `stripe listen --forward-to localhost:5173/api/stripe/webhook` |
 | `PUBLIC_STRIPE_PUBLISHABLE_KEY` | Payments | [Stripe Dashboard](https://dashboard.stripe.com/apikeys) |
 | `RESEND_API_KEY` | Email | [Resend Dashboard](https://resend.com/api-keys) |
+
+### Google Sign-In
+
+1. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials), create an OAuth client ID of type **Web application**.
+2. Under **Authorized redirect URIs**, add `http://localhost:5173/api/auth/callback/google` for local development and `https://your-app.fly.dev/api/auth/callback/google` for production.
+3. Put the client ID and secret in `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+
+Better Auth builds the callback URL from `PUBLIC_APP_URL`, so the redirect URI must start with the same address.
 
 ## Project Structure
 
@@ -69,9 +78,9 @@ jabstack/
 │   │   └── utils.ts          # Utility functions
 │   └── routes/
 │       ├── +page.svelte      # Marketing home page
-│       ├── auth/             # Auth pages
-│       ├── dashboard/        # Dashboard pages
-│       └── api/              # API routes
+│       ├── auth/login/       # Sign-in placeholder (redirects to /dashboard)
+│       ├── dashboard/        # Dashboard pages (no auth guard yet)
+│       └── api/auth/         # Better Auth handler for /api/auth/*
 ├── Dockerfile                # Bun-based Docker image
 ├── fly.toml                  # Fly.io configuration
 └── drizzle.config.ts         # Drizzle ORM config
@@ -103,6 +112,19 @@ JabStack uses two UI libraries for different purposes:
 - Headless primitives for custom designs
 - Located in `$lib/components/marketing/`
 - Used in all non-dashboard routes
+
+## Authentication
+
+Better Auth serves every route under `/api/auth/*` through `src/routes/api/auth/[...all]/+server.ts`, including the Google callback at `/api/auth/callback/google`. Sign users in and out with the client in `src/lib/auth-client.ts`:
+
+```ts
+import { signIn, signOut } from '$lib/auth-client.js';
+
+signIn.social({ provider: 'google', callbackURL: '/dashboard' });
+signOut();
+```
+
+`/auth/login` is a placeholder that redirects to `/dashboard`, so the home page's Sign In button has somewhere to go. When a project needs real sign-in, replace `src/routes/auth/login/+page.server.ts` with a sign-in page. The dashboard has no auth guard yet. [`documentation/LLM_CONTEXT.md`](documentation/LLM_CONTEXT.md) shows how to add both.
 
 ## Database
 
@@ -140,6 +162,8 @@ turso db tokens create jabstack
 Before deploying, update `fly.toml`:
 1. `app` - Your Fly.io app name
 2. `PUBLIC_APP_URL` in `[build.args]` - Your production URL
+
+Then add `https://your-app.fly.dev/api/auth/callback/google` (using your production URL) to your Google OAuth client's authorized redirect URIs.
 
 ```bash
 # Create app
