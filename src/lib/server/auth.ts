@@ -1,6 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { db } from './db/index.js';
+import * as schema from './db/schema.js';
 import {
 	BETTER_AUTH_SECRET,
 	GOOGLE_CLIENT_ID,
@@ -10,7 +11,10 @@ import { PUBLIC_APP_URL } from '$env/static/public';
 
 export const auth = betterAuth({
 	database: drizzleAdapter(db, {
-		provider: 'sqlite'
+		provider: 'sqlite',
+		schema,
+		// Tables are exported as `users`, `sessions`, `accounts` and `verifications`
+		usePlural: true
 	}),
 	secret: BETTER_AUTH_SECRET,
 	baseURL: PUBLIC_APP_URL,

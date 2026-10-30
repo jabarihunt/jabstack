@@ -17,7 +17,7 @@
 		ChevronRight,
 		Plus,
 		Mail
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import { page } from '$app/stores';
 
 	let collapsed = $state(false);

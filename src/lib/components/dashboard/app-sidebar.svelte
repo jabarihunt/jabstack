@@ -26,7 +26,7 @@
 		Search,
 		ChevronUp,
 		MoreHorizontal
-	} from 'lucide-svelte';
+	} from '@lucide/svelte';
 	import { page } from '$app/stores';
 
 	const user = {

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card/index.js';
 	import { cn, formatPercentage } from '$lib/utils.js';
-	import { TrendingUp, TrendingDown } from 'lucide-svelte';
+	import { TrendingUp, TrendingDown } from '@lucide/svelte';
 
 	interface Props {
 		title: string;

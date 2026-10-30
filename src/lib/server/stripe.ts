@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 import { STRIPE_SECRET_KEY } from '$env/static/private';
 
 export const stripe = new Stripe(STRIPE_SECRET_KEY, {
-	apiVersion: '2025-02-24.acacia'
+	apiVersion: '2026-10-28.endive'
 });
 
 // Helper to create a checkout session
@@ -20,7 +20,6 @@ export async function createCheckoutSession({
 	return stripe.checkout.sessions.create({
 		customer: customerId,
 		mode: 'subscription',
-		payment_method_types: ['card'],
 		line_items: [
 			{
 				price: priceId,

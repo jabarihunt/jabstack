@@ -2,7 +2,7 @@
 	import { Card, CardContent, CardHeader } from '$lib/components/ui/card/index.js';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { cn } from '$lib/utils.js';
-	import { Plus, Settings2 } from 'lucide-svelte';
+	import { Plus, Settings2 } from '@lucide/svelte';
 
 	interface TableRow {
 		header: string;

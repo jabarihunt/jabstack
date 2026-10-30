@@ -24,7 +24,7 @@ const privateEnvSchema = z.object({
 
 const publicEnvSchema = z.object({
 	PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().startsWith('pk_', 'PUBLIC_STRIPE_PUBLISHABLE_KEY must start with pk_'),
-	PUBLIC_APP_URL: z.string().url('PUBLIC_APP_URL must be a valid URL')
+	PUBLIC_APP_URL: z.url('PUBLIC_APP_URL must be a valid URL')
 });
 
 // Parse and validate private environment variables
@@ -47,13 +47,13 @@ const publicEnvResult = publicEnvSchema.safeParse({
 
 if (!privateEnvResult.success) {
 	console.error('❌ Invalid private environment variables:');
-	console.error(privateEnvResult.error.flatten().fieldErrors);
+	console.error(z.flattenError(privateEnvResult.error).fieldErrors);
 	throw new Error('Invalid private environment variables');
 }
 
 if (!publicEnvResult.success) {
 	console.error('❌ Invalid public environment variables:');
-	console.error(publicEnvResult.error.flatten().fieldErrors);
+	console.error(z.flattenError(publicEnvResult.error).fieldErrors);
 	throw new Error('Invalid public environment variables');
 }
 
