@@ -8,8 +8,8 @@ A modern, full-stack starter template for personal projects. Built with SvelteKi
 - **SvelteKit** - Full-stack web framework with SSR/SSG/SPA support
 - **Turso/SQLite** - LibSQL for production, SQLite for local development
 - **Better Auth** - Modern authentication with Google OAuth
-- **Stripe** - Payment processing for subscriptions
-- **Resend** - Transactional email service
+- **Stripe** - Helpers for subscription checkout, the billing portal and customers (no checkout route or webhook endpoint yet)
+- **Resend** - Transactional email templates (welcome, subscription confirmed, subscription cancelled)
 - **shadcn-svelte** - Beautiful UI components for dashboard
 - **Bits UI** - Headless components for marketing pages
 - **Fly.io** - Edge deployment with Docker
@@ -47,7 +47,7 @@ The `.env.example` file has sensible defaults for local development. You'll need
 | `GOOGLE_CLIENT_ID` | Google OAuth | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
 | `STRIPE_SECRET_KEY` | Payments | [Stripe Dashboard](https://dashboard.stripe.com/apikeys) |
-| `STRIPE_WEBHOOK_SECRET` | Webhooks | `stripe listen --forward-to localhost:5173/api/stripe/webhook` |
+| `STRIPE_WEBHOOK_SECRET` | Webhooks (once you add the endpoint) | `bun run stripe:cli` prints it |
 | `PUBLIC_STRIPE_PUBLISHABLE_KEY` | Payments | [Stripe Dashboard](https://dashboard.stripe.com/apikeys) |
 | `RESEND_API_KEY` | Email | [Resend Dashboard](https://resend.com/api-keys) |
 
@@ -67,23 +67,25 @@ jabstack/
 │   ├── lib/
 │   │   ├── components/
 │   │   │   ├── ui/           # shadcn-svelte components (dashboard)
-│   │   │   ├── dashboard/    # Dashboard-specific components
-│   │   │   └── marketing/    # Bits UI components (marketing)
+│   │   │   ├── dashboard/    # Dashboard components (sidebar, stats, chart, table)
+│   │   │   └── icons/        # Brand icons for the home page
 │   │   ├── server/           # Server-only code
-│   │   │   ├── db/           # Database (Drizzle)
+│   │   │   ├── db/           # Database client and Drizzle schema
 │   │   │   ├── auth.ts       # Better Auth config
-│   │   │   ├── stripe.ts     # Stripe config
-│   │   │   └── email.ts      # Resend config
-│   │   ├── env.ts            # Environment validation
-│   │   └── utils.ts          # Utility functions
+│   │   │   ├── stripe.ts     # Stripe client and helpers
+│   │   │   └── email.ts      # Resend client and email templates
+│   │   ├── auth-client.ts    # Better Auth client (signIn, signOut, useSession)
+│   │   ├── env.ts            # Zod schemas for env vars (not imported yet)
+│   │   └── utils.ts          # cn() and number formatting helpers
 │   └── routes/
 │       ├── +page.svelte      # Marketing home page
 │       ├── auth/login/       # Sign-in placeholder (redirects to /dashboard)
 │       ├── dashboard/        # Dashboard pages (no auth guard yet)
 │       └── api/auth/         # Better Auth handler for /api/auth/*
+├── drizzle/                  # Database migrations (committed)
 ├── Dockerfile                # Bun-based Docker image
 ├── fly.toml                  # Fly.io configuration
-└── drizzle.config.ts         # Drizzle ORM config
+└── drizzle.config.ts         # Drizzle Kit config
 ```
 
 ## Scripts
@@ -92,12 +94,16 @@ jabstack/
 bun run dev          # Start development server
 bun run build        # Build for production
 bun run preview      # Preview production build
-bun run test         # Run tests
+bun run check        # Type check
+bun run test         # Run tests in watch mode (test:unit runs once)
 bun run db:generate  # Generate database migrations
 bun run db:migrate   # Apply migrations
+bun run db:push      # Push schema without a migration (prototyping only)
 bun run db:studio    # Open Drizzle Studio
-bun run stripe:cli   # Forward Stripe webhooks to localhost
+bun run stripe:cli   # Forward Stripe webhooks to localhost:5173/api/stripe/webhook
 ```
+
+There's no Stripe webhook endpoint yet. `stripe:cli` forwards to `/api/stripe/webhook`, so add the handler at `src/routes/api/stripe/webhook/+server.ts`.
 
 ## UI Libraries
 
@@ -110,7 +116,7 @@ JabStack uses two UI libraries for different purposes:
 
 ### Marketing Pages → Bits UI
 - Headless primitives for custom designs
-- Located in `$lib/components/marketing/`
+- Imported from `bits-ui`. Put reusable marketing components in `$lib/components/marketing/`, which doesn't exist yet.
 - Used in all non-dashboard routes
 
 ## Authentication
@@ -124,7 +130,7 @@ signIn.social({ provider: 'google', callbackURL: '/dashboard' });
 signOut();
 ```
 
-`/auth/login` is a placeholder that redirects to `/dashboard`, so the home page's Sign In button has somewhere to go. When a project needs real sign-in, replace `src/routes/auth/login/+page.server.ts` with a sign-in page. The dashboard has no auth guard yet. [`documentation/LLM_CONTEXT.md`](documentation/LLM_CONTEXT.md) shows how to add both.
+`/auth/login` is a placeholder that redirects to `/dashboard`, so the home page's Sign In button has somewhere to go. When a project needs real sign-in, replace `src/routes/auth/login/+page.server.ts` with a sign-in page. The dashboard has no auth guard yet. [`AGENTS.md`](AGENTS.md) shows how to add both.
 
 ## Database
 
@@ -165,6 +171,8 @@ Before deploying, update `fly.toml`:
 
 Then add `https://your-app.fly.dev/api/auth/callback/google` (using your production URL) to your Google OAuth client's authorized redirect URIs.
 
+> **Known issue:** the app reads secrets from `$env/static/private`, which SvelteKit writes into the build. The app ignores values set with `fly secrets set` and uses whatever was in `.env` when the image was built. With no `.dockerignore`, that's your local `.env`. The migration release command does read Fly secrets, so it can migrate a different database than the one the app connects to. The fix is to switch server code to `$env/dynamic/private` and add a `.dockerignore`.
+
 ```bash
 # Create app
 fly apps create your-app-name
@@ -193,7 +201,7 @@ See `.mcp/mcp.json` for configuration.
 
 ## Documentation
 
-- [`documentation/LLM_CONTEXT.md`](documentation/LLM_CONTEXT.md) - AI assistant context
+- [`AGENTS.md`](AGENTS.md) - Instructions for AI coding agents (read by Claude Code through `CLAUDE.md`, and by Cursor, Windsurf, Kiro and GitHub Copilot)
 - [`plans/jabstack-architecture.md`](plans/jabstack-architecture.md) - Architecture details
 
 ## License
