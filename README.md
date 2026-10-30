@@ -21,10 +21,11 @@ A modern, full-stack starter template for personal projects. Built with SvelteKi
 2. cd jabstack
 3. bun install
 4. cp .env.example .env
-5. bun run dev
+5. bun run db:migrate
+6. bun run dev
 ```
 
-The app runs at `http://localhost:5173` with SQLite out of the box. Auth and payments won't work until you configure the API keys in `.env`.
+`bun run db:migrate` creates `local.db` and its tables. The app runs at `http://localhost:5173` with SQLite out of the box. Auth and payments won't work until you configure the API keys in `.env`.
 
 ## Full Setup
 
@@ -107,6 +108,16 @@ JabStack uses two UI libraries for different purposes:
 
 ### Local Development
 Uses SQLite file (`local.db`) for simplicity.
+
+### Migrations
+Migrations are SQL files in `drizzle/` and are committed to git. After changing `src/lib/server/db/schema.ts`:
+
+```bash
+bun run db:generate  # Write a new migration to drizzle/
+bun run db:migrate   # Apply it to the database in DATABASE_URL
+```
+
+Commit the new files in `drizzle/` with the schema change. On Fly.io, the `release_command` in `fly.toml` runs `bun run db:migrate` against your production database before each release goes live.
 
 ### Production
 Uses [Turso](https://turso.tech) (libSQL) for edge-distributed database.

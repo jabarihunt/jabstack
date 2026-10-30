@@ -59,7 +59,7 @@ Never access `process.env` directly. Always use the validated `env` export.
 - **Production**: Turso (libSQL)
 - **ORM**: Drizzle - all queries should use Drizzle's type-safe query builder
 - **Schema**: Defined in `src/lib/server/db/schema.ts`
-- **Migrations**: Run via `bun run db:migrate`
+- **Migrations**: SQL files in `drizzle/`, committed to git. Generate with `bun run db:generate`, apply with `bun run db:migrate`. Fly.io applies them on deploy through `release_command` in `fly.toml`
 
 ### 4. Authentication Flow
 
@@ -111,7 +111,8 @@ src/
 1. Define schema in `src/lib/server/db/schema.ts` using Drizzle
 2. Generate migration: `bun run db:generate`
 3. Apply migration: `bun run db:migrate`
-4. Create type exports in `src/lib/types.ts` if needed
+4. Commit the new files in `drizzle/` with the schema change
+5. Create type exports in `src/lib/types.ts` if needed
 
 ### Adding a New API Endpoint
 

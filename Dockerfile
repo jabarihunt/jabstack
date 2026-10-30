@@ -31,6 +31,10 @@ COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/node_modules ./node_modules
 
+# Copy database migrations (applied by the release command in fly.toml)
+COPY --from=builder /app/drizzle ./drizzle
+COPY --from=builder /app/drizzle.config.ts ./
+
 # Set environment variables
 ENV NODE_ENV=production
 ENV PORT=3000

@@ -25,7 +25,6 @@ vite.config.ts.timestamp-*
 # Database
 *.db
 *.db-journal
-/drizzle
 
 # IDE
 .idea

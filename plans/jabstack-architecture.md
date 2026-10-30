@@ -38,8 +38,7 @@ jabstack/
 │   │   ├── server/
 │   │   │   ├── db/
 │   │   │   │   ├── index.ts           # Database client
-│   │   │   │   ├── schema.ts          # Drizzle schema
-│   │   │   │   └── migrations/        # Database migrations
+│   │   │   │   └── schema.ts          # Drizzle schema
 │   │   │   ├── auth.ts                # Better Auth configuration
 │   │   │   ├── stripe.ts              # Stripe configuration
 │   │   │   └── email.ts               # Resend configuration
@@ -67,6 +66,7 @@ jabstack/
 │   ├── app.html                       # HTML template
 │   ├── app.css                        # Global styles + Tailwind
 │   └── app.d.ts                       # TypeScript declarations
+├── drizzle/                           # Database migrations (generated, committed)
 ├── static/
 │   ├── favicon.ico
 │   └── robots.txt
