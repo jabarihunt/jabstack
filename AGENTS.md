@@ -34,7 +34,7 @@ bun run db:studio    # Open Drizzle Studio
 bun run stripe:cli   # Forward Stripe webhooks to localhost:5173/api/stripe/webhook
 ```
 
-Before finishing a change, run `bun run check` and `bun run build`. `check` should report 0 errors. Its one existing warning is in `stats-card.svelte`.
+Before finishing a change, run `bun run check` and `bun run build`. `check` should report 0 errors and 0 warnings.
 
 ## Project Layout
 
@@ -122,10 +122,10 @@ const session = await auth.api.getSession({ headers: request.headers });
 
 ### Add a dashboard page
 1. Create `src/routes/dashboard/<name>/+page.svelte` with shadcn-svelte components.
-2. Add a nav item to `src/lib/components/dashboard/app-sidebar.svelte`, the sidebar the layout uses. `sidebar.svelte` is an older copy that nothing imports.
+2. Add a nav item to the Platform group in `src/lib/components/dashboard/app-sidebar.svelte`. Only add links to pages that exist.
 3. Load data in `+page.server.ts` if needed.
 
-The sidebar already links to placeholder pages (Lifecycle, Analytics, Projects, Team, Settings and others) that don't exist yet. Create the page or remove the link.
+The sidebar links to Dashboard and Settings. `src/routes/dashboard/settings/+page.svelte` is a placeholder page that each project replaces.
 
 ### Add a marketing page
 Create `src/routes/<name>/+page.svelte` with Bits UI and custom Tailwind styling, and add SEO tags in `<svelte:head>`.

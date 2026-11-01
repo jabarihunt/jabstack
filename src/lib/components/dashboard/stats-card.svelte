@@ -13,7 +13,7 @@
 
 	let { title, value, change, description, class: className }: Props = $props();
 
-	const isPositive = change >= 0;
+	const isPositive = $derived(change >= 0);
 </script>
 
 <Card class={cn('', className)}>

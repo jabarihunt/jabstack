@@ -31,7 +31,6 @@ jabstack/
 │   │   │   ├── ui/                    # shadcn-svelte components
 │   │   │   ├── dashboard/             # Dashboard-specific components
 │   │   │   │   ├── app-sidebar.svelte # Sidebar used by the dashboard layout
-│   │   │   │   ├── sidebar.svelte     # Older sidebar, not used
 │   │   │   │   ├── stats-card.svelte
 │   │   │   │   ├── area-chart.svelte
 │   │   │   │   └── data-table.svelte
@@ -57,7 +56,7 @@ jabstack/
 │   │   │   ├── +layout.svelte         # Dashboard layout with sidebar
 │   │   │   ├── +layout.server.ts      # Auth guard (added per project)
 │   │   │   ├── +page.svelte           # Main dashboard - dashboard-01
-│   │   │   └── settings/+page.svelte  # User settings (not built yet)
+│   │   │   └── settings/+page.svelte  # Settings (placeholder page)
 │   │   ├── api/
 │   │   │   ├── auth/[...all]/+server.ts  # Better Auth handler for /api/auth/* (incl. Google callback)
 │   │   │   └── stripe/
@@ -455,7 +454,7 @@ This separation allows:
 
 The dashboard implements the shadcn dashboard-01 block with:
 
-1. **Collapsible Sidebar** (`app-sidebar.svelte`) - Navigation with icons, collapsible to icon-only mode. Most links point to pages that don't exist yet.
+1. **Collapsible Sidebar** (`app-sidebar.svelte`) - Navigation with icons, collapsible to icon-only mode. It links to Dashboard and a placeholder Settings page. Projects add a link as they add each page.
 2. **Stats Cards** - Four metric cards showing key statistics
 3. **Area Chart** - Chart.js time-series chart with 3-month, 30-day and 7-day buttons
 4. **Data Table** - Table with tab buttons. The tabs don't change the rows yet, and there's no sorting or filtering.
