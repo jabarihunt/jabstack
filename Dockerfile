@@ -15,10 +15,11 @@ COPY package.json bun.lock ./
 # Install dependencies
 RUN bun install --frozen-lockfile
 
-# Copy source code
+# Copy source code (.dockerignore keeps out node_modules, .env and local databases)
 COPY . .
 
-# Build the application
+# Build the application. No secrets are needed here: the app reads them
+# from the environment when it starts (see src/env.ts).
 RUN bun run build
 
 # Production stage

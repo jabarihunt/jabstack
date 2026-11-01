@@ -6,8 +6,8 @@ import {
 	BETTER_AUTH_SECRET,
 	GOOGLE_CLIENT_ID,
 	GOOGLE_CLIENT_SECRET
-} from '$env/static/private';
-import { PUBLIC_APP_URL } from '$env/static/public';
+} from '$app/env/private';
+import { PUBLIC_APP_URL } from '$app/env/public';
 
 export const auth = betterAuth({
 	database: drizzleAdapter(db, {

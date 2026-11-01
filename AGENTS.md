@@ -7,7 +7,8 @@ JabStack is a SvelteKit starter template. Each new project starts as a copy of i
 | Layer | Technology | Key files |
 |-------|------------|-----------|
 | Runtime, package manager | Bun | `bun.lock`, `Dockerfile` |
-| Framework | SvelteKit 2, Svelte 5 (runes), TypeScript | `svelte.config.js`, `src/routes/` |
+| Framework | SvelteKit 3, Svelte 5 (runes), TypeScript 6, Vite 8 | `vite.config.ts` (SvelteKit config and Bun adapter), `src/routes/` |
+| Environment variables | SvelteKit `defineEnvVars`, validated with Zod | `src/env.ts`, `.env.example` |
 | Database | SQLite locally, Turso in production, Drizzle ORM | `src/lib/server/db/`, `drizzle/`, `drizzle.config.ts` |
 | Auth | Better Auth, Google OAuth only | `src/lib/server/auth.ts`, `src/lib/auth-client.ts` |
 | Payments, email | Stripe, Resend | `src/lib/server/stripe.ts`, `src/lib/server/email.ts` |
@@ -23,7 +24,7 @@ Use `bun`, never npm, yarn or pnpm.
 
 ```bash
 bun run dev          # Dev server at http://localhost:5173
-bun run build        # Production build
+bun run build        # Production build (runs Vite under Bun, which the Bun adapter requires)
 bun run check        # Type check with svelte-check
 bun run test:unit    # Run Vitest once (bun run test starts watch mode)
 bun run db:generate  # Write a migration to drizzle/ from schema.ts
@@ -33,12 +34,13 @@ bun run db:studio    # Open Drizzle Studio
 bun run stripe:cli   # Forward Stripe webhooks to localhost:5173/api/stripe/webhook
 ```
 
-Before finishing a change, run `bun run check` and `bun run build`. `check` currently reports 20 errors in `app-sidebar.svelte` and `sidebar.svelte`, because the sidebars link to pages that don't exist yet. Don't add new errors.
+Before finishing a change, run `bun run check` and `bun run build`. `check` should report 0 errors. Its one existing warning is in `stats-card.svelte`.
 
 ## Project Layout
 
 ```
 src/
+├── env.ts                # Every environment variable, with Zod validation
 ├── lib/
 │   ├── components/
 │   │   ├── ui/           # shadcn-svelte (dashboard only)
@@ -48,7 +50,6 @@ src/
 │   ├── hooks/            # is-mobile, used by the shadcn sidebar
 │   ├── server/           # Server-only: db/, auth.ts, stripe.ts, email.ts
 │   ├── auth-client.ts    # Better Auth client (signIn, signOut, useSession)
-│   ├── env.ts            # Zod schemas for env vars (not imported yet)
 │   └── utils.ts          # cn(), formatCurrency(), formatNumber(), formatPercentage()
 └── routes/
     ├── +page.svelte      # Marketing home page
@@ -61,26 +62,26 @@ drizzle/                  # Migrations (generated, committed)
 ## Conventions
 
 ### UI libraries
-- `/dashboard/*` routes use shadcn-svelte components from `$lib/components/ui/`.
+- `/dashboard/*` routes use shadcn-svelte components from `#lib/components/ui/`.
 - All other routes use Bits UI (`bits-ui`) with custom Tailwind styling. Marketing pages are meant to look different in every project.
 - Never mix the two.
-- Put reusable marketing components in `$lib/components/marketing/`. Create the folder when you add the first one. The home page currently imports Bits UI directly.
-- `components.json` points at the Tailwind 3 registry (`tw3.shadcn-svelte.com`). Follow that site's instructions when adding shadcn components.
+- Put reusable marketing components in `#lib/components/marketing/`. Create the folder when you add the first one. The home page currently imports Bits UI directly.
+- `components.json` points at the Tailwind 3 registry (`tw3.shadcn-svelte.com`), and its aliases use `#lib`. Follow that site's instructions when adding shadcn components, and check that the new files import from `#lib/`.
 
 ### Svelte and TypeScript
 - Write Svelte 5 runes (`$props`, `$state`, `$derived`, `$effect`).
-- Import from `src/lib/` with `$lib/` and include the `.js` extension for TypeScript modules (`$lib/utils.js`), as the rest of the code does.
-- Merge Tailwind classes with `cn()` from `$lib/utils.js`.
-- Use `$app/state` in new code. The dashboard layout and sidebars still use the deprecated `$app/stores`.
+- Import from `src/lib/` with `#lib/` and include the file extension (`#lib/utils.js` for `utils.ts`, `#lib/components/.../x.svelte`). SvelteKit 3 has no `$lib` alias. `#lib` is a subpath import defined under `imports` in `package.json`.
+- Merge Tailwind classes with `cn()` from `#lib/utils.js`.
+- Read page state from `$app/state` (`page`, `navigating`, `updated`). `$app/stores` no longer exists.
 - Use form actions with `use:enhance` for forms in pages. Use `+server.ts` endpoints for JSON APIs.
 
 ### Server code and secrets
 - Code in `src/lib/server/` is server-only. Never import it from client components.
-- Import private env vars from `$env/static/private` and public ones (prefixed `PUBLIC_`) from `$env/static/public`.
+- Every environment variable is declared in `src/env.ts` with `defineEnvVars` and a Zod schema. Import private ones from `$app/env/private` and public ones from `$app/env/public`. `$env/*` is deprecated.
+- Variables are read when the app starts, so values set with `fly secrets set` take effect. Only `PUBLIC_APP_URL` is `static: true` (written into the build from the `fly.toml` build argument).
+- Invalid or missing values stop the app from starting. While building, secrets are optional and fall back to placeholders, because the Docker build has no secrets. When adding a secret, wrap its schema in `secret(...)` the same way.
 - Don't read `process.env` in app code. `drizzle.config.ts` is the exception, because drizzle-kit runs outside SvelteKit.
 - `.env.example` lists every variable. Never commit `.env`.
-- `src/lib/env.ts` defines Zod schemas and exports a validated `env` object, but nothing imports it, so that validation doesn't run.
-- Known issue: `$env/static/private` values are written into the build, so secrets set later with `fly secrets set` don't reach the app. Switching server code to `$env/dynamic/private` fixes this.
 - Validate API input with Zod.
 
 ### Database
@@ -102,7 +103,7 @@ Better Auth handles sign-in, sessions and the OAuth callback. Google is the only
 Client:
 
 ```ts
-import { signIn, signOut, useSession } from '$lib/auth-client.js';
+import { signIn, signOut, useSession } from '#lib/auth-client.js';
 
 signIn.social({ provider: 'google', callbackURL: '/dashboard' });
 signOut();
@@ -112,7 +113,7 @@ const session = useSession(); // a store: $session.data is the session or null
 Server: there's no `src/hooks.server.ts`, so `event.locals` has no session. Read it in a server `load` function or endpoint:
 
 ```ts
-import { auth } from '$lib/server/auth.js';
+import { auth } from '#lib/server/auth.js';
 
 const session = await auth.api.getSession({ headers: request.headers });
 ```
@@ -130,7 +131,7 @@ The sidebar already links to placeholder pages (Lifecycle, Analytics, Projects, 
 Create `src/routes/<name>/+page.svelte` with Bits UI and custom Tailwind styling, and add SEO tags in `<svelte:head>`.
 
 ### Add an API endpoint
-Create `src/routes/api/<name>/+server.ts`, export method handlers (`GET`, `POST`), validate input with Zod and return `json(...)`. There's no Stripe webhook endpoint yet. `stripe:cli` expects one at `src/routes/api/stripe/webhook/+server.ts`.
+Create `src/routes/api/<name>/+server.ts`, export method handlers (`GET`, `POST`), validate input with Zod and return `Response.json(...)`. SvelteKit 3 deprecates its `json()` helper. There's no Stripe webhook endpoint yet. `stripe:cli` expects one at `src/routes/api/stripe/webhook/+server.ts`.
 
 ### Add real sign-in
 1. Delete `src/routes/auth/login/+page.server.ts` (the redirect placeholder).
@@ -139,7 +140,7 @@ Create `src/routes/api/<name>/+server.ts`, export method handlers (`GET`, `POST`
 ```svelte
 <script lang="ts">
 	import { Button } from 'bits-ui';
-	import { signIn } from '$lib/auth-client.js';
+	import { signIn } from '#lib/auth-client.js';
 </script>
 
 <Button.Root onclick={() => signIn.social({ provider: 'google', callbackURL: '/dashboard' })}>
@@ -154,7 +155,7 @@ Create `src/routes/dashboard/+layout.server.ts`:
 
 ```ts
 import { redirect } from '@sveltejs/kit';
-import { auth } from '$lib/server/auth.js';
+import { auth } from '#lib/server/auth.js';
 import type { LayoutServerLoad } from './$types.js';
 
 export const load: LayoutServerLoad = async ({ request }) => {
@@ -168,10 +169,10 @@ Replace the `/auth/login` placeholder first. It redirects to `/dashboard`, so wi
 
 ## Deployment
 
-The app deploys to Fly.io as a Bun-based Docker image. Before the first deploy, set `app` and `PUBLIC_APP_URL` (under `[build.args]`) in `fly.toml`, set secrets with `fly secrets set` (see the known issue under "Server code and secrets"), and add the production Google callback URL. `fly deploy` builds the image and applies migrations before the release goes live.
+The app deploys to Fly.io as a Bun-based Docker image built with `@sveltejs/adapter-bun`. Before the first deploy, set `app` and `PUBLIC_APP_URL` (under `[build.args]`) in `fly.toml`, and add the production Google callback URL. Set every other variable in `src/env.ts`, including `PUBLIC_STRIPE_PUBLISHABLE_KEY`, with `fly secrets set`. The app won't start without them. `fly deploy` builds the image and applies migrations before the release goes live.
+
+The Bun adapter assumes requests arrived over HTTPS, which is true behind Fly's proxy. `.dockerignore` keeps `.env`, `node_modules` and local databases out of the image.
 
 ## Notes
 
-- `svelte-adapter-bun` is deprecated. Replace it with `@sveltejs/adapter-bun` when moving to SvelteKit 3.
 - `.mcp/mcp.json` configures Stripe, Turso, shadcn and Svelte MCP servers.
-- `svelte.config.js` defines a `$components` alias that nothing uses.

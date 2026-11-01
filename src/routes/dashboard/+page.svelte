@@ -1,8 +1,8 @@
 <script lang="ts">
-	import StatsCard from '$lib/components/dashboard/stats-card.svelte';
-	import AreaChart from '$lib/components/dashboard/area-chart.svelte';
-	import DataTable from '$lib/components/dashboard/data-table.svelte';
-	import { formatCurrency, formatNumber } from '$lib/utils.js';
+	import StatsCard from '#lib/components/dashboard/stats-card.svelte';
+	import AreaChart from '#lib/components/dashboard/area-chart.svelte';
+	import DataTable from '#lib/components/dashboard/data-table.svelte';
+	import { formatCurrency, formatNumber } from '#lib/utils.js';
 
 	// Sample stats data
 	const stats = [

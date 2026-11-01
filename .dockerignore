@@ -1,0 +1,18 @@
+# Installed and generated in the image
+node_modules
+.svelte-kit
+build
+
+# Secrets: the app reads them from Fly secrets at runtime
+.env
+.env.*
+!.env.example
+
+# Local data and tooling
+*.db
+*.db-journal
+.git
+.vscode
+.idea
+.DS_Store
+coverage

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { cn } from '$lib/utils.js';
-	import { Button } from '$lib/components/ui/button/index.js';
+	import { cn } from '#lib/utils.js';
+	import { Button } from '#lib/components/ui/button/index.js';
 	import {
 		LayoutDashboard,
 		LineChart,
@@ -18,7 +18,7 @@
 		Plus,
 		Mail
 	} from '@lucide/svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 
 	let collapsed = $state(false);
 </script>
@@ -79,7 +79,7 @@
 			href="/dashboard"
 			class={cn(
 				'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-				$page.url.pathname === '/dashboard'
+				page.url.pathname === '/dashboard'
 					? 'bg-sidebar-accent text-sidebar-accent-foreground'
 					: 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
 				collapsed && 'justify-center px-2'
@@ -92,7 +92,7 @@
 			href="/dashboard/lifecycle"
 			class={cn(
 				'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-				$page.url.pathname === '/dashboard/lifecycle'
+				page.url.pathname === '/dashboard/lifecycle'
 					? 'bg-sidebar-accent text-sidebar-accent-foreground'
 					: 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
 				collapsed && 'justify-center px-2'
@@ -105,7 +105,7 @@
 			href="/dashboard/analytics"
 			class={cn(
 				'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-				$page.url.pathname === '/dashboard/analytics'
+				page.url.pathname === '/dashboard/analytics'
 					? 'bg-sidebar-accent text-sidebar-accent-foreground'
 					: 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
 				collapsed && 'justify-center px-2'
@@ -118,7 +118,7 @@
 			href="/dashboard/projects"
 			class={cn(
 				'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-				$page.url.pathname === '/dashboard/projects'
+				page.url.pathname === '/dashboard/projects'
 					? 'bg-sidebar-accent text-sidebar-accent-foreground'
 					: 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
 				collapsed && 'justify-center px-2'
@@ -131,7 +131,7 @@
 			href="/dashboard/team"
 			class={cn(
 				'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-				$page.url.pathname === '/dashboard/team'
+				page.url.pathname === '/dashboard/team'
 					? 'bg-sidebar-accent text-sidebar-accent-foreground'
 					: 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
 				collapsed && 'justify-center px-2'
@@ -153,7 +153,7 @@
 			href="/dashboard/data-library"
 			class={cn(
 				'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-				$page.url.pathname === '/dashboard/data-library'
+				page.url.pathname === '/dashboard/data-library'
 					? 'bg-sidebar-accent text-sidebar-accent-foreground'
 					: 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
 				collapsed && 'justify-center px-2'
@@ -166,7 +166,7 @@
 			href="/dashboard/reports"
 			class={cn(
 				'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-				$page.url.pathname === '/dashboard/reports'
+				page.url.pathname === '/dashboard/reports'
 					? 'bg-sidebar-accent text-sidebar-accent-foreground'
 					: 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
 				collapsed && 'justify-center px-2'
@@ -179,7 +179,7 @@
 			href="/dashboard/word-assistant"
 			class={cn(
 				'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-				$page.url.pathname === '/dashboard/word-assistant'
+				page.url.pathname === '/dashboard/word-assistant'
 					? 'bg-sidebar-accent text-sidebar-accent-foreground'
 					: 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
 				collapsed && 'justify-center px-2'
@@ -196,7 +196,7 @@
 			href="/dashboard/settings"
 			class={cn(
 				'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-				$page.url.pathname === '/dashboard/settings'
+				page.url.pathname === '/dashboard/settings'
 					? 'bg-sidebar-accent text-sidebar-accent-foreground'
 					: 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
 				collapsed && 'justify-center px-2'
@@ -209,7 +209,7 @@
 			href="/dashboard/help"
 			class={cn(
 				'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-				$page.url.pathname === '/dashboard/help'
+				page.url.pathname === '/dashboard/help'
 					? 'bg-sidebar-accent text-sidebar-accent-foreground'
 					: 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
 				collapsed && 'justify-center px-2'
@@ -222,7 +222,7 @@
 			href="/dashboard/search"
 			class={cn(
 				'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-				$page.url.pathname === '/dashboard/search'
+				page.url.pathname === '/dashboard/search'
 					? 'bg-sidebar-accent text-sidebar-accent-foreground'
 					: 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
 				collapsed && 'justify-center px-2'

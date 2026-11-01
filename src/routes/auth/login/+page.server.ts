@@ -7,7 +7,7 @@ import type { PageServerLoad } from './$types.js';
 // To add real sign-in, delete this file and create +page.svelte with a button
 // that calls the Better Auth client, for example:
 //
-//   import { signIn } from '$lib/auth-client.js';
+//   import { signIn } from '#lib/auth-client.js';
 //   signIn.social({ provider: 'google', callbackURL: '/dashboard' });
 //
 // Better Auth handles the rest under /api/auth/*. Google returns users to

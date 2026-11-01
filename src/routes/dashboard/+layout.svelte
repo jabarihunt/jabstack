@@ -1,9 +1,9 @@
 <script lang="ts">
-	import AppSidebar from '$lib/components/dashboard/app-sidebar.svelte';
-	import { SidebarProvider, SidebarInset, SidebarTrigger } from '$lib/components/ui/sidebar/index.js';
-	import { Separator } from '$lib/components/ui/separator/index.js';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
-	import { page } from '$app/stores';
+	import AppSidebar from '#lib/components/dashboard/app-sidebar.svelte';
+	import { SidebarProvider, SidebarInset, SidebarTrigger } from '#lib/components/ui/sidebar/index.js';
+	import { Separator } from '#lib/components/ui/separator/index.js';
+	import * as Breadcrumb from '#lib/components/ui/breadcrumb/index.js';
+	import { page } from '$app/state';
 
 	let { children } = $props();
 
@@ -31,7 +31,7 @@
 				<Separator orientation="vertical" class="mr-2 h-4" />
 				<Breadcrumb.Root>
 					<Breadcrumb.List>
-						{#each getBreadcrumbs($page.url.pathname) as crumb, i}
+						{#each getBreadcrumbs(page.url.pathname) as crumb, i}
 							{#if i > 0}
 								<Breadcrumb.Separator class="hidden md:block" />
 							{/if}

@@ -5,7 +5,7 @@ A modern, full-stack starter template for personal projects. Built with SvelteKi
 ## Features
 
 - **Bun** - Fast JavaScript runtime and package manager
-- **SvelteKit** - Full-stack web framework with SSR/SSG/SPA support
+- **SvelteKit 3** - Full-stack web framework with SSR/SSG/SPA support, on Vite 8
 - **Turso/SQLite** - LibSQL for production, SQLite for local development
 - **Better Auth** - Modern authentication with Google OAuth
 - **Stripe** - Helpers for subscription checkout, the billing portal and customers (no checkout route or webhook endpoint yet)
@@ -38,7 +38,7 @@ A modern, full-stack starter template for personal projects. Built with SvelteKi
 
 ### Environment Variables
 
-The `.env.example` file has sensible defaults for local development. You'll need to configure:
+Every variable is declared and validated in `src/env.ts`. The app refuses to start if one is missing or has the wrong format, and the error lists which ones. The placeholder values in `.env.example` pass validation, so the Quickstart works without real keys. You'll need to configure:
 
 | Variable | Required For | Get From |
 |----------|--------------|----------|
@@ -64,6 +64,7 @@ Better Auth builds the callback URL from `PUBLIC_APP_URL`, so the redirect URI m
 ```
 jabstack/
 ├── src/
+│   ├── env.ts                # Environment variables and their validation
 │   ├── lib/
 │   │   ├── components/
 │   │   │   ├── ui/           # shadcn-svelte components (dashboard)
@@ -75,7 +76,6 @@ jabstack/
 │   │   │   ├── stripe.ts     # Stripe client and helpers
 │   │   │   └── email.ts      # Resend client and email templates
 │   │   ├── auth-client.ts    # Better Auth client (signIn, signOut, useSession)
-│   │   ├── env.ts            # Zod schemas for env vars (not imported yet)
 │   │   └── utils.ts          # cn() and number formatting helpers
 │   └── routes/
 │       ├── +page.svelte      # Marketing home page
@@ -83,6 +83,7 @@ jabstack/
 │       ├── dashboard/        # Dashboard pages (no auth guard yet)
 │       └── api/auth/         # Better Auth handler for /api/auth/*
 ├── drizzle/                  # Database migrations (committed)
+├── vite.config.ts            # Vite and SvelteKit config (Bun adapter)
 ├── Dockerfile                # Bun-based Docker image
 ├── fly.toml                  # Fly.io configuration
 └── drizzle.config.ts         # Drizzle Kit config
@@ -92,7 +93,7 @@ jabstack/
 
 ```bash
 bun run dev          # Start development server
-bun run build        # Build for production
+bun run build        # Build for production (runs Vite under Bun for the Bun adapter)
 bun run preview      # Preview production build
 bun run check        # Type check
 bun run test         # Run tests in watch mode (test:unit runs once)
@@ -111,12 +112,12 @@ JabStack uses two UI libraries for different purposes:
 
 ### Dashboard Pages → shadcn-svelte
 - Pre-styled, consistent components
-- Located in `$lib/components/ui/`
+- Located in `#lib/components/ui/`
 - Used in `/dashboard/*` routes
 
 ### Marketing Pages → Bits UI
 - Headless primitives for custom designs
-- Imported from `bits-ui`. Put reusable marketing components in `$lib/components/marketing/`, which doesn't exist yet.
+- Imported from `bits-ui`. Put reusable marketing components in `#lib/components/marketing/`, which doesn't exist yet.
 - Used in all non-dashboard routes
 
 ## Authentication
@@ -124,7 +125,7 @@ JabStack uses two UI libraries for different purposes:
 Better Auth serves every route under `/api/auth/*` through `src/routes/api/auth/[...all]/+server.ts`, including the Google callback at `/api/auth/callback/google`. Sign users in and out with the client in `src/lib/auth-client.ts`:
 
 ```ts
-import { signIn, signOut } from '$lib/auth-client.js';
+import { signIn, signOut } from '#lib/auth-client.js';
 
 signIn.social({ provider: 'google', callbackURL: '/dashboard' });
 signOut();
@@ -171,7 +172,7 @@ Before deploying, update `fly.toml`:
 
 Then add `https://your-app.fly.dev/api/auth/callback/google` (using your production URL) to your Google OAuth client's authorized redirect URIs.
 
-> **Known issue:** the app reads secrets from `$env/static/private`, which SvelteKit writes into the build. The app ignores values set with `fly secrets set` and uses whatever was in `.env` when the image was built. With no `.dockerignore`, that's your local `.env`. The migration release command does read Fly secrets, so it can migrate a different database than the one the app connects to. The fix is to switch server code to `$env/dynamic/private` and add a `.dockerignore`.
+The app reads its secrets when it starts. Set every variable in `src/env.ts` as a Fly secret except `PUBLIC_APP_URL`, which `fly.toml` passes as a build argument. The app won't start if a required one is missing. `.dockerignore` keeps your local `.env` out of the image.
 
 ```bash
 # Create app
@@ -181,7 +182,7 @@ fly apps create your-app-name
 fly secrets set DATABASE_URL=libsql://... DATABASE_AUTH_TOKEN=...
 fly secrets set BETTER_AUTH_SECRET=...
 fly secrets set GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=...
-fly secrets set STRIPE_SECRET_KEY=... STRIPE_WEBHOOK_SECRET=...
+fly secrets set STRIPE_SECRET_KEY=... STRIPE_WEBHOOK_SECRET=... PUBLIC_STRIPE_PUBLISHABLE_KEY=...
 fly secrets set RESEND_API_KEY=...
 
 # Deploy

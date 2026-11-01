@@ -47,7 +47,6 @@ jabstack/
 │   │   │   ├── stripe.ts              # Stripe client and helpers
 │   │   │   └── email.ts               # Resend client and email templates
 │   │   ├── auth-client.ts             # Better Auth client (signIn, signOut, useSession)
-│   │   ├── env.ts                     # Zod schemas for env vars (not imported yet)
 │   │   └── utils.ts                   # cn() and number formatting helpers
 │   ├── routes/
 │   │   ├── +layout.svelte             # Root layout
@@ -64,6 +63,7 @@ jabstack/
 │   │   │   └── stripe/
 │   │   │       └── webhook/+server.ts    # Stripe webhook handler (not built yet)
 │   │   └── [...catchall]/+page.svelte    # 404 page (not built yet)
+│   ├── env.ts                         # Environment variables (defineEnvVars + Zod)
 │   ├── app.html                       # HTML template
 │   ├── app.css                        # Global styles + Tailwind
 │   └── app.d.ts                       # TypeScript declarations
@@ -73,15 +73,15 @@ jabstack/
 │   └── robots.txt
 ├── tests/                             # Vitest tests (not created yet)
 ├── .env.example                       # Environment variable template
+├── .dockerignore                      # Keeps .env, node_modules and local databases out of the image
 ├── .gitignore
 ├── components.json                    # shadcn-svelte configuration (Tailwind 3 registry)
 ├── Dockerfile                         # Bun-based Docker image for Fly.io
 ├── fly.toml                           # Fly.io configuration
 ├── drizzle.config.ts                  # Drizzle Kit configuration
-├── svelte.config.js                   # SvelteKit configuration
 ├── tailwind.config.ts                 # Tailwind CSS configuration
-├── tsconfig.json                      # TypeScript configuration
-├── vite.config.ts                     # Vite configuration
+├── tsconfig.json                      # TypeScript configuration (extends $app/tsconfig)
+├── vite.config.ts                     # Vite and SvelteKit configuration (Bun adapter)
 ├── vitest.config.ts                   # Vitest configuration
 ├── package.json
 ├── bun.lock                           # Bun lock file
@@ -273,51 +273,63 @@ PUBLIC_APP_URL=             # Application URL - https://your-app.fly.dev
 
 ## Key Implementation Details
 
-### 1. SvelteKit Adapter for Bun
+### 1. SvelteKit Configuration and Bun Adapter
 
-```javascript
-// svelte.config.js
-import adapter from 'svelte-adapter-bun';
+SvelteKit 3 reads its configuration from the `sveltekit()` Vite plugin. There's no `svelte.config.js`.
 
-const config = {
-  kit: {
-    adapter: adapter(),
-    alias: {
-      $components: 'src/lib/components',
-      '$components/*': 'src/lib/components/*'
-    }
-  }
-};
+```typescript
+// vite.config.ts
+import adapter from '@sveltejs/adapter-bun';
+import { sveltekit } from '@sveltejs/kit/vite';
+import { defineConfig } from 'vite';
 
-export default config;
+export default defineConfig({
+	plugins: [
+		sveltekit({
+			adapter: adapter()
+		})
+	]
+});
 ```
 
-`svelte-adapter-bun` is deprecated. Its replacement, the official `@sveltejs/adapter-bun`, requires SvelteKit 3. Nothing uses the `$components` alias.
+`@sveltejs/adapter-bun` calls Bun's build API, so the `build` script runs Vite under Bun (`bun --bun vite build`). The output starts with `bun ./build/index.js`. The adapter assumes requests arrived over HTTPS, which holds behind Fly's TLS-terminating proxy.
+
+`src/lib` is imported as `#lib/...`, a subpath import declared under `imports` in `package.json`. SvelteKit 3 has no `$lib` alias.
 
 ### 2. Environment Variables
 
-Server modules import secrets from `$env/static/private` and public values from `$env/static/public` directly. `.env.example` lists every variable.
-
-`src/lib/env.ts` validates all of them with Zod and exports a combined `env` object, but nothing imports it yet, so the checks never run:
+Every variable is declared in `src/env.ts` with SvelteKit's `defineEnvVars` and validated with Zod. Server code imports private values from `$app/env/private` and public values from `$app/env/public`. `.env.example` lists every variable.
 
 ```typescript
-// src/lib/env.ts (abridged)
-const privateEnvSchema = z.object({
-  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
-  DATABASE_AUTH_TOKEN: z.string().optional(),
-  BETTER_AUTH_SECRET: z.string().min(32, 'BETTER_AUTH_SECRET must be at least 32 characters'),
-  STRIPE_SECRET_KEY: z.string().startsWith('sk_', 'STRIPE_SECRET_KEY must start with sk_'),
-  // ... Google, Stripe webhook and Resend keys
+// src/env.ts (abridged)
+import { defineEnvVars } from '@sveltejs/kit/env';
+import { building } from '$app/env';
+import { z } from 'zod';
+
+// While building, a missing secret becomes a placeholder. At startup it's required.
+const secret = (schema: z.ZodString, buildPlaceholder: string) =>
+	building ? z.string().optional().transform((value) => value || buildPlaceholder) : schema;
+
+export const variables = defineEnvVars({
+	PUBLIC_APP_URL: {
+		public: true,
+		static: true,
+		schema: z.url('PUBLIC_APP_URL must be a valid URL')
+	},
+	DATABASE_URL: {
+		schema: secret(z.string().min(1, 'DATABASE_URL is required'), ':memory:')
+	},
+	STRIPE_SECRET_KEY: {
+		schema: secret(z.string().startsWith('sk_', 'STRIPE_SECRET_KEY must start with sk_'), 'sk_build_placeholder')
+	}
+	// ... Better Auth, Google, Stripe webhook and publishable key, Resend
 });
-
-const privateEnvResult = privateEnvSchema.safeParse({ DATABASE_URL, DATABASE_AUTH_TOKEN /* ... */ });
-if (!privateEnvResult.success) throw new Error('Invalid private environment variables');
-// The public variables are checked the same way
-
-export const env = { ...privateEnvResult.data, ...publicEnvResult.data };
 ```
 
-Known issue: SvelteKit writes `$env/static/private` values into the build, so secrets set at runtime (`fly secrets set`) don't reach the app. Server code should move to `$env/dynamic/private`.
+- Variables are dynamic by default, so they're read when the server starts. That's how secrets set with `fly secrets set` reach the app.
+- `PUBLIC_APP_URL` is the only static variable. It's written into the build from the `fly.toml` build argument.
+- If a value is missing or invalid, the app refuses to start and lists every bad variable.
+- The build loads server modules (Better Auth, the database client) without any secrets. The placeholders let it finish, and they never reach a running server.
 
 ### 3. Database Setup with Drizzle
 
@@ -327,12 +339,12 @@ Local SQLite file for development (`DATABASE_URL=file:local.db`), Turso for prod
 // src/lib/server/db/index.ts
 import { drizzle } from 'drizzle-orm/libsql';
 import { createClient } from '@libsql/client';
-import { DATABASE_URL, DATABASE_AUTH_TOKEN } from '$env/static/private';
+import { DATABASE_URL, DATABASE_AUTH_TOKEN } from '$app/env/private';
 import * as schema from './schema.js';
 
 const client = createClient({
-  url: DATABASE_URL,
-  authToken: DATABASE_AUTH_TOKEN || undefined
+	url: DATABASE_URL,
+	authToken: DATABASE_AUTH_TOKEN || undefined
 });
 
 export const db = drizzle(client, { schema });
@@ -399,9 +411,10 @@ EXPOSE 3000
 CMD ["bun", "./build/index.js"]
 ```
 
-- `fly.toml` passes `PUBLIC_APP_URL` as a build argument, because SvelteKit writes public values into the build.
-- `release_command = "bun run db:migrate"` in `fly.toml` applies migrations in a temporary Machine before each release goes live. That's why the runtime image includes `drizzle/`, `drizzle.config.ts` and all of `node_modules` (drizzle-kit is a dev dependency).
-- There's no `.dockerignore`, so `COPY . .` also copies the local `.env`, `node_modules` and `.git` into the build stage. Combined with the `$env/static/private` issue above, the build uses the local `.env` values.
+- `fly.toml` passes `PUBLIC_APP_URL` as a build argument, because it's a static variable written into the build. The build needs no other variables.
+- `.dockerignore` keeps `.env`, `node_modules`, `.svelte-kit`, local databases and `.git` out of the build context.
+- Secrets come from `fly secrets set` and are read when the server starts.
+- `release_command = "bun run db:migrate"` in `fly.toml` applies migrations in a temporary Machine before each release goes live. It reads the same `DATABASE_URL` secret as the app. That's why the runtime image includes `drizzle/`, `drizzle.config.ts` and all of `node_modules` (drizzle-kit is a dev dependency).
 
 ## MCP Server Configurations
 
@@ -457,7 +470,7 @@ All components use static placeholder data for flexibility across different proj
 4. Create Resend account and get API key
 5. Set `app` and `PUBLIC_APP_URL` (under `[build.args]`) in `fly.toml`
 6. Create Fly.io app: `fly apps create <your-app>`
-7. Set secrets: `fly secrets set DATABASE_URL=... DATABASE_AUTH_TOKEN=...` and the other keys (see the known issue under Environment Variables)
+7. Set secrets: `fly secrets set DATABASE_URL=... DATABASE_AUTH_TOKEN=...` and every other variable in `src/env.ts` except `PUBLIC_APP_URL`. The app won't start if one is missing.
 8. Deploy: `fly deploy`. Migrations run automatically before the release goes live.
 
 ## Next Steps After Setup

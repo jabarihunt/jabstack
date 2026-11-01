@@ -1,6 +1,6 @@
 import { Resend } from 'resend';
-import { RESEND_API_KEY } from '$env/static/private';
-import { PUBLIC_APP_URL } from '$env/static/public';
+import { RESEND_API_KEY } from '$app/env/private';
+import { PUBLIC_APP_URL } from '$app/env/public';
 
 export const resend = new Resend(RESEND_API_KEY);
 

@@ -11,7 +11,7 @@
 		SidebarMenuButton,
 		SidebarMenuItem,
 		SidebarRail
-	} from '$lib/components/ui/sidebar/index.js';
+	} from '#lib/components/ui/sidebar/index.js';
 	import {
 		LayoutDashboard,
 		LineChart,
@@ -27,7 +27,7 @@
 		ChevronUp,
 		MoreHorizontal
 	} from '@lucide/svelte';
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 
 	const user = {
 		name: 'shadcn',
@@ -62,7 +62,7 @@
 			<SidebarGroupContent>
 				<SidebarMenu>
 					<SidebarMenuItem>
-						<SidebarMenuButton isActive={$page.url.pathname === '/dashboard'}>
+						<SidebarMenuButton isActive={page.url.pathname === '/dashboard'}>
 							{#snippet child({ props })}
 								<a href="/dashboard" {...props}>
 									<LayoutDashboard class="size-4" />
@@ -72,7 +72,7 @@
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 					<SidebarMenuItem>
-						<SidebarMenuButton isActive={$page.url.pathname === '/dashboard/lifecycle'}>
+						<SidebarMenuButton isActive={page.url.pathname === '/dashboard/lifecycle'}>
 							{#snippet child({ props })}
 								<a href="/dashboard/lifecycle" {...props}>
 									<LineChart class="size-4" />
@@ -82,7 +82,7 @@
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 					<SidebarMenuItem>
-						<SidebarMenuButton isActive={$page.url.pathname === '/dashboard/analytics'}>
+						<SidebarMenuButton isActive={page.url.pathname === '/dashboard/analytics'}>
 							{#snippet child({ props })}
 								<a href="/dashboard/analytics" {...props}>
 									<FileBarChart class="size-4" />
@@ -92,7 +92,7 @@
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 					<SidebarMenuItem>
-						<SidebarMenuButton isActive={$page.url.pathname === '/dashboard/projects'}>
+						<SidebarMenuButton isActive={page.url.pathname === '/dashboard/projects'}>
 							{#snippet child({ props })}
 								<a href="/dashboard/projects" {...props}>
 									<FolderKanban class="size-4" />
@@ -102,7 +102,7 @@
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 					<SidebarMenuItem>
-						<SidebarMenuButton isActive={$page.url.pathname === '/dashboard/team'}>
+						<SidebarMenuButton isActive={page.url.pathname === '/dashboard/team'}>
 							{#snippet child({ props })}
 								<a href="/dashboard/team" {...props}>
 									<Users class="size-4" />
@@ -121,7 +121,7 @@
 			<SidebarGroupContent>
 				<SidebarMenu>
 					<SidebarMenuItem>
-						<SidebarMenuButton isActive={$page.url.pathname === '/dashboard/data-library'}>
+						<SidebarMenuButton isActive={page.url.pathname === '/dashboard/data-library'}>
 							{#snippet child({ props })}
 								<a href="/dashboard/data-library" {...props}>
 									<Database class="size-4" />
@@ -131,7 +131,7 @@
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 					<SidebarMenuItem>
-						<SidebarMenuButton isActive={$page.url.pathname === '/dashboard/reports'}>
+						<SidebarMenuButton isActive={page.url.pathname === '/dashboard/reports'}>
 							{#snippet child({ props })}
 								<a href="/dashboard/reports" {...props}>
 									<FileText class="size-4" />
@@ -141,7 +141,7 @@
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 					<SidebarMenuItem>
-						<SidebarMenuButton isActive={$page.url.pathname === '/dashboard/word-assistant'}>
+						<SidebarMenuButton isActive={page.url.pathname === '/dashboard/word-assistant'}>
 							{#snippet child({ props })}
 								<a href="/dashboard/word-assistant" {...props}>
 									<MessageSquare class="size-4" />
@@ -169,7 +169,7 @@
 			<SidebarGroupContent>
 				<SidebarMenu>
 					<SidebarMenuItem>
-						<SidebarMenuButton isActive={$page.url.pathname === '/dashboard/settings'}>
+						<SidebarMenuButton isActive={page.url.pathname === '/dashboard/settings'}>
 							{#snippet child({ props })}
 								<a href="/dashboard/settings" {...props}>
 									<Settings class="size-4" />
@@ -179,7 +179,7 @@
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 					<SidebarMenuItem>
-						<SidebarMenuButton isActive={$page.url.pathname === '/dashboard/help'}>
+						<SidebarMenuButton isActive={page.url.pathname === '/dashboard/help'}>
 							{#snippet child({ props })}
 								<a href="/dashboard/help" {...props}>
 									<HelpCircle class="size-4" />
@@ -189,7 +189,7 @@
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 					<SidebarMenuItem>
-						<SidebarMenuButton isActive={$page.url.pathname === '/dashboard/search'}>
+						<SidebarMenuButton isActive={page.url.pathname === '/dashboard/search'}>
 							{#snippet child({ props })}
 								<a href="/dashboard/search" {...props}>
 									<Search class="size-4" />

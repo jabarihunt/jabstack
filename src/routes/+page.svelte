@@ -9,7 +9,7 @@
 		ResendIcon,
 		ShadcnIcon,
 		FlyIcon
-	} from '$lib/components/icons/index.js';
+	} from '#lib/components/icons/index.js';
 
 	const techStack = [
 		{ name: 'Bun', description: 'Runtime', icon: BunIcon },
