@@ -50,6 +50,7 @@ Every variable is declared and validated in `src/env.ts`. The app refuses to sta
 | `STRIPE_WEBHOOK_SECRET` | Webhooks (once you add the endpoint) | `bun run stripe:cli` prints it |
 | `PUBLIC_STRIPE_PUBLISHABLE_KEY` | Payments | [Stripe Dashboard](https://dashboard.stripe.com/apikeys) |
 | `RESEND_API_KEY` | Email | [Resend Dashboard](https://resend.com/api-keys) |
+| `EMAIL_FROM` | Email sender (optional) | An address on a domain verified in [Resend](https://resend.com/domains), e.g. `JabStack <noreply@yourdomain.com>`. Defaults to Resend's test sender, which only delivers to your own Resend address |
 
 ### Google Sign-In
 
@@ -79,6 +80,7 @@ jabstack/
 │   │   └── utils.ts          # cn() and number formatting helpers
 │   └── routes/
 │       ├── +page.svelte      # Marketing home page
+│       ├── +error.svelte     # 404 and error page
 │       ├── auth/login/       # Sign-in placeholder (redirects to /dashboard)
 │       ├── dashboard/        # Dashboard pages (no auth guard yet)
 │       └── api/auth/         # Better Auth handler for /api/auth/*
@@ -103,6 +105,8 @@ bun run db:push      # Push schema without a migration (prototyping only)
 bun run db:studio    # Open Drizzle Studio
 bun run stripe:cli   # Forward Stripe webhooks to localhost:5173/api/stripe/webhook
 ```
+
+Tests live next to the code they cover (`src/**/*.test.ts`) and mock external services, so they run without API keys. `.env.test` supplies the one value Vitest needs when there's no `.env`.
 
 There's no Stripe webhook endpoint yet. `stripe:cli` forwards to `/api/stripe/webhook`, so add the handler at `src/routes/api/stripe/webhook/+server.ts`.
 
@@ -183,7 +187,7 @@ fly secrets set DATABASE_URL=libsql://... DATABASE_AUTH_TOKEN=...
 fly secrets set BETTER_AUTH_SECRET=...
 fly secrets set GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=...
 fly secrets set STRIPE_SECRET_KEY=... STRIPE_WEBHOOK_SECRET=... PUBLIC_STRIPE_PUBLISHABLE_KEY=...
-fly secrets set RESEND_API_KEY=...
+fly secrets set RESEND_API_KEY=... EMAIL_FROM="Your App <noreply@yourdomain.com>"
 
 # Deploy
 fly deploy

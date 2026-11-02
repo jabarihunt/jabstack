@@ -19,7 +19,7 @@ JabStack is a modern, full-stack starter template designed for personal projects
 | Dashboard UI | shadcn-svelte + Tailwind CSS | Pre-styled components for dashboard interfaces |
 | Marketing UI | Bits UI + Tailwind CSS | Headless primitives for fully custom marketing designs |
 | Hosting | Fly.io | Edge deployment platform |
-| Testing | Vitest | Unit testing framework |
+| Testing | Vitest | Unit tests next to the code (`src/**/*.test.ts`), with external services mocked |
 
 ## Project Structure
 
@@ -61,7 +61,7 @@ jabstack/
 │   │   │   ├── auth/[...all]/+server.ts  # Better Auth handler for /api/auth/* (incl. Google callback)
 │   │   │   └── stripe/
 │   │   │       └── webhook/+server.ts    # Stripe webhook handler (not built yet)
-│   │   └── [...catchall]/+page.svelte    # 404 page (not built yet)
+│   │   └── +error.svelte                 # 404 and error page for every route
 │   ├── env.ts                         # Environment variables (defineEnvVars + Zod)
 │   ├── app.html                       # HTML template
 │   ├── app.css                        # Global styles + Tailwind
@@ -70,8 +70,8 @@ jabstack/
 ├── static/
 │   ├── favicon.svg
 │   └── robots.txt
-├── tests/                             # Vitest tests (not created yet)
 ├── .env.example                       # Environment variable template
+├── .env.test                          # Non-secret values Vitest needs (committed)
 ├── .dockerignore                      # Keeps .env, node_modules and local databases out of the image
 ├── .gitignore
 ├── components.json                    # shadcn-svelte configuration (Tailwind 3 registry)
@@ -265,6 +265,7 @@ PUBLIC_STRIPE_PUBLISHABLE_KEY=  # Stripe publishable key - client-safe
 
 # Email
 RESEND_API_KEY=             # Resend API key
+EMAIL_FROM=                 # Optional sender, e.g. "JabStack <noreply@yourdomain.com>"
 
 # App
 PUBLIC_APP_URL=             # Application URL - https://your-app.fly.dev

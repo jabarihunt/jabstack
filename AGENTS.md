@@ -15,7 +15,7 @@ JabStack is a SvelteKit starter template. Each new project starts as a copy of i
 | Dashboard UI | shadcn-svelte | `src/lib/components/ui/` |
 | Marketing UI | Bits UI | `bits-ui` |
 | Styling | Tailwind CSS 3 | `tailwind.config.ts`, `src/app.css` |
-| Testing | Vitest (no tests yet) | `vitest.config.ts` |
+| Testing | Vitest | `vitest.config.ts`, `.env.test`, `src/**/*.test.ts` |
 | Hosting | Fly.io | `fly.toml`, `Dockerfile` |
 
 ## Commands
@@ -34,7 +34,7 @@ bun run db:studio    # Open Drizzle Studio
 bun run stripe:cli   # Forward Stripe webhooks to localhost:5173/api/stripe/webhook
 ```
 
-Before finishing a change, run `bun run check` and `bun run build`. `check` should report 0 errors and 0 warnings.
+Before finishing a change, run `bun run check`, `bun run test:unit` and `bun run build`. `check` should report 0 errors and 0 warnings.
 
 ## Project Layout
 
@@ -53,6 +53,7 @@ src/
 │   └── utils.ts          # cn(), formatCurrency(), formatNumber(), formatPercentage()
 └── routes/
     ├── +page.svelte      # Marketing home page
+    ├── +error.svelte     # 404 and error page for every route
     ├── auth/login/       # Sign-in placeholder (redirects to /dashboard)
     ├── dashboard/        # Dashboard (no auth guard yet)
     └── api/auth/         # Better Auth handler for /api/auth/*
@@ -81,7 +82,8 @@ drizzle/                  # Migrations (generated, committed)
 - Variables are read when the app starts, so values set with `fly secrets set` take effect. Only `PUBLIC_APP_URL` is `static: true` (written into the build from the `fly.toml` build argument).
 - Invalid or missing values stop the app from starting. While building, secrets are optional and fall back to placeholders, because the Docker build has no secrets. When adding a secret, wrap its schema in `secret(...)` the same way.
 - Don't read `process.env` in app code. `drizzle.config.ts` is the exception, because drizzle-kit runs outside SvelteKit.
-- `.env.example` lists every variable. Never commit `.env`.
+- `.env.example` lists every variable. Never commit `.env`. `.env.test` is committed and holds only non-secret values for tests.
+- `EMAIL_FROM` sets the email sender. It defaults to Resend's test sender, which only delivers to your own Resend address.
 - Validate API input with Zod.
 
 ### Database
@@ -129,6 +131,9 @@ The sidebar links to Dashboard and Settings. `src/routes/dashboard/settings/+pag
 
 ### Add a marketing page
 Create `src/routes/<name>/+page.svelte` with Bits UI and custom Tailwind styling, and add SEO tags in `<svelte:head>`.
+
+### Add a test
+Put tests next to the code they cover as `<name>.test.ts`. Mock `$app/env/private`, `$app/env/public` and external SDKs with `vi.mock`, as `src/lib/server/email.test.ts` and `stripe.test.ts` do. Tests never call real services. Every test must make at least one `expect` call (`requireAssertions` is on).
 
 ### Add an API endpoint
 Create `src/routes/api/<name>/+server.ts`, export method handlers (`GET`, `POST`), validate input with Zod and return `Response.json(...)`. SvelteKit 3 deprecates its `json()` helper. There's no Stripe webhook endpoint yet. `stripe:cli` expects one at `src/routes/api/stripe/webhook/+server.ts`.

@@ -72,5 +72,17 @@ export const variables = defineEnvVars({
 			're_build_placeholder'
 		),
 		description: 'Resend API key.'
+	},
+	EMAIL_FROM: {
+		// Defaults to Resend's test sender, which can only deliver to your own Resend
+		// account's address. Set it to an address on your verified domain for real users.
+		schema: z
+			.string()
+			.regex(
+				/^(?:[^<>]+<[^\s@<>]+@[^\s@<>]+>|[^\s@<>]+@[^\s@<>]+)$/,
+				'EMAIL_FROM must be an email address or "Name <email@example.com>"'
+			)
+			.default('JabStack <onboarding@resend.dev>'),
+		description: 'Sender for transactional email, e.g. "JabStack <noreply@yourdomain.com>". The domain must be verified in Resend.'
 	}
 });

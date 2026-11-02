@@ -1,11 +1,8 @@
 import { Resend } from 'resend';
-import { RESEND_API_KEY } from '$app/env/private';
+import { EMAIL_FROM, RESEND_API_KEY } from '$app/env/private';
 import { PUBLIC_APP_URL } from '$app/env/public';
 
 export const resend = new Resend(RESEND_API_KEY);
-
-// Default from address - update this with your verified domain
-const FROM_EMAIL = 'JabStack <noreply@yourdomain.com>';
 
 // Names come from users (for example their Google profile), so escape them
 // before putting them into HTML.
@@ -26,7 +23,7 @@ export async function sendWelcomeEmail({
 	name?: string;
 }) {
 	return resend.emails.send({
-		from: FROM_EMAIL,
+		from: EMAIL_FROM,
 		to,
 		subject: 'Welcome to JabStack!',
 		html: `
@@ -47,7 +44,7 @@ export async function sendSubscriptionConfirmation({
 	plan: string;
 }) {
 	return resend.emails.send({
-		from: FROM_EMAIL,
+		from: EMAIL_FROM,
 		to,
 		subject: 'Subscription Confirmed',
 		html: `
@@ -69,7 +66,7 @@ export async function sendSubscriptionCancellation({
 	endDate: Date;
 }) {
 	return resend.emails.send({
-		from: FROM_EMAIL,
+		from: EMAIL_FROM,
 		to,
 		subject: 'Subscription Cancelled',
 		html: `

@@ -1,9 +1,15 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig, mergeConfig } from 'vitest/config';
+import viteConfig from './vite.config.js';
 
-export default defineConfig({
-	test: {
-		include: ['src/**/*.{test,spec}.{js,ts}', 'tests/**/*.{test,spec}.{js,ts}'],
-		environment: 'node',
-		globals: true
-	}
-});
+// Reuses vite.config.ts so tests get the SvelteKit plugin (for $app/* modules and #lib).
+export default mergeConfig(
+	viteConfig,
+	defineConfig({
+		test: {
+			include: ['src/**/*.{test,spec}.{js,ts}', 'tests/**/*.{test,spec}.{js,ts}'],
+			environment: 'node',
+			// Fail tests that never reach an expect(), e.g. when an await is forgotten
+			expect: { requireAssertions: true }
+		}
+	})
+);
