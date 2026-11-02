@@ -15,7 +15,9 @@ JabStack is a SvelteKit starter template. Each new project starts as a copy of i
 | Dashboard UI | shadcn-svelte | `src/lib/components/ui/` |
 | Marketing UI | Bits UI | `bits-ui` |
 | Styling | Tailwind CSS 3 | `tailwind.config.ts`, `src/app.css` |
-| Testing | Vitest | `vitest.config.ts`, `.env.test`, `src/**/*.test.ts` |
+| Unit tests | Vitest | `vitest.config.ts`, `.env.test`, `src/**/*.test.ts` |
+| Acceptance tests | Playwright (Chromium) | `playwright.config.ts`, `tests/acceptance/` |
+| CI | GitHub Actions | `.github/workflows/ci.yml` |
 | Hosting | Fly.io | `fly.toml`, `Dockerfile` |
 
 ## Commands
@@ -27,6 +29,8 @@ bun run dev          # Dev server at http://localhost:5173
 bun run build        # Production build (runs Vite under Bun, which the Bun adapter requires)
 bun run check        # Type check with svelte-check
 bun run test:unit    # Run Vitest once (bun run test starts watch mode)
+bun run test:acceptance  # Build the app and run the Playwright tests against it
+bun run test:criteria    # Check every acceptance criterion has a test (no browser needed)
 bun run db:generate  # Write a migration to drizzle/ from schema.ts
 bun run db:migrate   # Apply migrations to DATABASE_URL
 bun run db:push      # Push schema without a migration (prototyping only)
@@ -34,7 +38,7 @@ bun run db:studio    # Open Drizzle Studio
 bun run stripe:cli   # Forward Stripe webhooks to localhost:5173/api/stripe/webhook
 ```
 
-Before finishing a change, run `bun run check`, `bun run test:unit` and `bun run build`. `check` should report 0 errors and 0 warnings.
+Before finishing a change, run `bun run check`, `bun run test:unit`, `bun run test:criteria` and `bun run test:acceptance`. `check` should report 0 errors and 0 warnings. CI runs the same steps on every push and pull request.
 
 ## Project Layout
 
@@ -58,6 +62,8 @@ src/
     ├── dashboard/        # Dashboard (no auth guard yet)
     └── api/auth/         # Better Auth handler for /api/auth/*
 drizzle/                  # Migrations (generated, committed)
+tests/acceptance/         # Playwright tests and criteria.md (the acceptance criteria)
+scripts/                  # check-acceptance-criteria.ts (bun run test:criteria)
 ```
 
 ## Conventions
@@ -132,8 +138,16 @@ The sidebar links to Dashboard and Settings. `src/routes/dashboard/settings/+pag
 ### Add a marketing page
 Create `src/routes/<name>/+page.svelte` with Bits UI and custom Tailwind styling, and add SEO tags in `<svelte:head>`.
 
-### Add a test
-Put tests next to the code they cover as `<name>.test.ts`. Mock `$app/env/private`, `$app/env/public` and external SDKs with `vi.mock`, as `src/lib/server/email.test.ts` and `stripe.test.ts` do. Tests never call real services. Every test must make at least one `expect` call (`requireAssertions` is on).
+### Add an acceptance criterion and its test
+1. Add a line to `tests/acceptance/criteria.md` with the next unused ID: `- **AC-NN**: description`. Never reuse an ID.
+2. Add a test to a `*.spec.ts` file in `tests/acceptance/` whose title starts with the ID: `test('AC-NN: what the user can do', ...)`. One criterion can have several tests. A test can name several IDs.
+3. Test what a user sees and does: use `page.getByRole`, `getByText` and URLs, not CSS classes.
+4. Run `bun run test:criteria` and `bun run test:acceptance`. Run one criterion with `bun run test:acceptance --grep "AC-NN:"`.
+
+The tests run against a production build served by `vite preview` on port 4173, using placeholder settings from `playwright.config.ts` and a separate `acceptance-test.db`. They must never call Google, Stripe or Resend. Running them replaces `build/` with a test build.
+
+### Add a unit test
+Put unit tests next to the code they cover as `<name>.test.ts`. Mock `$app/env/private`, `$app/env/public` and external SDKs with `vi.mock`, as `src/lib/server/email.test.ts` and `stripe.test.ts` do. Tests never call real services. Every test must make at least one `expect` call (`requireAssertions` is on).
 
 ### Add an API endpoint
 Create `src/routes/api/<name>/+server.ts`, export method handlers (`GET`, `POST`), validate input with Zod and return `Response.json(...)`. SvelteKit 3 deprecates its `json()` helper. There's no Stripe webhook endpoint yet. `stripe:cli` expects one at `src/routes/api/stripe/webhook/+server.ts`.

@@ -19,7 +19,9 @@ JabStack is a modern, full-stack starter template designed for personal projects
 | Dashboard UI | shadcn-svelte + Tailwind CSS | Pre-styled components for dashboard interfaces |
 | Marketing UI | Bits UI + Tailwind CSS | Headless primitives for fully custom marketing designs |
 | Hosting | Fly.io | Edge deployment platform |
-| Testing | Vitest | Unit tests next to the code (`src/**/*.test.ts`), with external services mocked |
+| Unit testing | Vitest | Unit tests next to the code (`src/**/*.test.ts`), with external services mocked |
+| Acceptance testing | Playwright | Browser tests in `tests/acceptance/`, each named after a criterion ID (`AC-NN`) in `tests/acceptance/criteria.md` |
+| CI | GitHub Actions | Type check, unit tests, criteria check and acceptance tests on every push and pull request |
 
 ## Project Structure
 
@@ -72,6 +74,10 @@ jabstack/
 │   └── robots.txt
 ├── .env.example                       # Environment variable template
 ├── .env.test                          # Non-secret values Vitest needs (committed)
+├── .github/workflows/ci.yml           # CI: type check, unit tests, criteria check, acceptance tests
+├── tests/acceptance/                  # Playwright acceptance tests and criteria.md
+├── scripts/check-acceptance-criteria.ts  # Checks every criterion in criteria.md has a test
+├── playwright.config.ts               # Playwright: builds the app and serves it on port 4173
 ├── .dockerignore                      # Keeps .env, node_modules and local databases out of the image
 ├── .gitignore
 ├── components.json                    # shadcn-svelte configuration (Tailwind 3 registry)

@@ -98,7 +98,9 @@ bun run dev          # Start development server
 bun run build        # Build for production (runs Vite under Bun for the Bun adapter)
 bun run preview      # Preview production build
 bun run check        # Type check
-bun run test         # Run tests in watch mode (test:unit runs once)
+bun run test         # Run unit tests in watch mode (test:unit runs once)
+bun run test:acceptance  # Build the app and run the Playwright acceptance tests
+bun run test:criteria    # Check every acceptance criterion has a test
 bun run db:generate  # Generate database migrations
 bun run db:migrate   # Apply migrations
 bun run db:push      # Push schema without a migration (prototyping only)
@@ -106,7 +108,11 @@ bun run db:studio    # Open Drizzle Studio
 bun run stripe:cli   # Forward Stripe webhooks to localhost:5173/api/stripe/webhook
 ```
 
-Tests live next to the code they cover (`src/**/*.test.ts`) and mock external services, so they run without API keys. `.env.test` supplies the one value Vitest needs when there's no `.env`.
+Unit tests live next to the code they cover (`src/**/*.test.ts`) and mock external services, so they run without API keys. `.env.test` supplies the one value Vitest needs when there's no `.env`.
+
+Acceptance tests live in `tests/acceptance/`. Each test's title starts with the ID of a criterion in `tests/acceptance/criteria.md`, such as `AC-03: ...`, and `test:criteria` fails if any criterion has no test. `test:acceptance` installs Chromium if needed, builds the app with placeholder settings and serves it on port 4173. Running it replaces `build/` with that test build.
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the type check, unit tests, criteria check and acceptance tests on every push to `master` and every pull request. When tests fail, the Playwright report is attached to the run.
 
 There's no Stripe webhook endpoint yet. `stripe:cli` forwards to `/api/stripe/webhook`, so add the handler at `src/routes/api/stripe/webhook/+server.ts`.
 
