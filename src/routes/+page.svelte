@@ -40,16 +40,17 @@
 		<div class="container mx-auto flex h-16 items-center justify-between px-4">
 			<a href="/" class="text-xl font-bold">JabStack</a>
 			<div class="flex items-center gap-4">
-				<a href="/auth/login">
-					<Button.Root class="px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900 transition-colors">
-						Sign In
-					</Button.Root>
-				</a>
-				<a href="https://github.com/jabarihunt/jabstack" target="_blank" rel="noopener noreferrer">
-					<Button.Root class="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 transition-colors">
-						GitHub
-					</Button.Root>
-				</a>
+				<Button.Root href="/auth/login" class="px-4 py-2 text-sm text-zinc-600 hover:text-zinc-900 transition-colors">
+					Sign In
+				</Button.Root>
+				<Button.Root
+					href="https://github.com/jabarihunt/jabstack"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 transition-colors"
+				>
+					GitHub
+				</Button.Root>
 			</div>
 		</div>
 	</nav>
@@ -64,16 +65,17 @@
 				A modern, full-stack starter template for personal projects. Built with SvelteKit, Turso, Better Auth, Stripe, and deployed on Fly.io.
 			</p>
 			<div class="mt-10 flex items-center justify-center gap-4">
-				<a href="https://github.com/jabarihunt/jabstack" target="_blank" rel="noopener noreferrer">
-					<Button.Root class="rounded-lg bg-zinc-900 px-6 py-3 font-medium text-white hover:bg-zinc-800 transition-colors">
-						GitHub
-					</Button.Root>
-				</a>
-				<a href="/dashboard">
-					<Button.Root class="rounded-lg border border-zinc-300 px-6 py-3 font-medium text-zinc-900 hover:bg-zinc-100 transition-colors">
-						View Dashboard
-					</Button.Root>
-				</a>
+				<Button.Root
+					href="https://github.com/jabarihunt/jabstack"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="rounded-lg bg-zinc-900 px-6 py-3 font-medium text-white hover:bg-zinc-800 transition-colors"
+				>
+					GitHub
+				</Button.Root>
+				<Button.Root href="/dashboard" class="rounded-lg border border-zinc-300 px-6 py-3 font-medium text-zinc-900 hover:bg-zinc-100 transition-colors">
+					View Dashboard
+				</Button.Root>
 			</div>
 		</div>
 

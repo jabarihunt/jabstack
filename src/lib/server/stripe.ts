@@ -45,7 +45,9 @@ export async function createPortalSession({
 	});
 }
 
-// Helper to create or get a Stripe customer
+// Helper to get or create the Stripe customer for a user.
+// Customers are matched by the userId in their metadata, not by email, so two
+// accounts that share an email address never share billing.
 export async function getOrCreateCustomer({
 	email,
 	name,
@@ -55,9 +57,9 @@ export async function getOrCreateCustomer({
 	name?: string;
 	userId: string;
 }) {
-	// Search for existing customer
-	const existingCustomers = await stripe.customers.list({
-		email,
+	const escapedUserId = userId.replace(/["\\]/g, '\\$&');
+	const existingCustomers = await stripe.customers.search({
+		query: `metadata["userId"]:"${escapedUserId}"`,
 		limit: 1
 	});
 
@@ -65,12 +67,19 @@ export async function getOrCreateCustomer({
 		return existingCustomers.data[0];
 	}
 
-	// Create new customer
-	return stripe.customers.create({
-		email,
-		name: name || undefined,
-		metadata: {
-			userId
-		}
-	});
+	// Stripe's search can lag behind newly created customers (usually under a
+	// minute), so a second call soon after the first may not find the customer.
+	// The idempotency key makes Stripe return the same customer instead of
+	// creating a duplicate. For a lookup that never lags, store the customer ID
+	// on the user in your database.
+	return stripe.customers.create(
+		{
+			email,
+			name: name || undefined,
+			metadata: {
+				userId
+			}
+		},
+		{ idempotencyKey: `create-customer-${userId}` }
+	);
 }

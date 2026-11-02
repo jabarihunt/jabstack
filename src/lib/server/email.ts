@@ -7,6 +7,17 @@ export const resend = new Resend(RESEND_API_KEY);
 // Default from address - update this with your verified domain
 const FROM_EMAIL = 'JabStack <noreply@yourdomain.com>';
 
+// Names come from users (for example their Google profile), so escape them
+// before putting them into HTML.
+function escapeHtml(value: string): string {
+	return value
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&#39;');
+}
+
 export async function sendWelcomeEmail({
 	to,
 	name
@@ -19,7 +30,7 @@ export async function sendWelcomeEmail({
 		to,
 		subject: 'Welcome to JabStack!',
 		html: `
-			<h1>Welcome${name ? `, ${name}` : ''}!</h1>
+			<h1>Welcome${name ? `, ${escapeHtml(name)}` : ''}!</h1>
 			<p>Thank you for signing up for JabStack.</p>
 			<p>Get started by visiting your <a href="${PUBLIC_APP_URL}/dashboard">dashboard</a>.</p>
 		`
@@ -41,8 +52,8 @@ export async function sendSubscriptionConfirmation({
 		subject: 'Subscription Confirmed',
 		html: `
 			<h1>Subscription Confirmed</h1>
-			<p>Hi${name ? ` ${name}` : ''},</p>
-			<p>Your subscription to the <strong>${plan}</strong> plan has been confirmed.</p>
+			<p>Hi${name ? ` ${escapeHtml(name)}` : ''},</p>
+			<p>Your subscription to the <strong>${escapeHtml(plan)}</strong> plan has been confirmed.</p>
 			<p>Visit your <a href="${PUBLIC_APP_URL}/dashboard">dashboard</a> to get started.</p>
 		`
 	});
@@ -63,7 +74,7 @@ export async function sendSubscriptionCancellation({
 		subject: 'Subscription Cancelled',
 		html: `
 			<h1>Subscription Cancelled</h1>
-			<p>Hi${name ? ` ${name}` : ''},</p>
+			<p>Hi${name ? ` ${escapeHtml(name)}` : ''},</p>
 			<p>Your subscription has been cancelled and will end on ${endDate.toLocaleDateString()}.</p>
 			<p>You can resubscribe anytime from your <a href="${PUBLIC_APP_URL}/dashboard/settings">settings</a>.</p>
 		`

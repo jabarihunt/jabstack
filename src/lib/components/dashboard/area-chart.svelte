@@ -2,7 +2,6 @@
 	import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#lib/components/ui/card/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { cn } from '#lib/utils.js';
-	import { onMount } from 'svelte';
 
 	interface Props {
 		title?: string;
@@ -14,7 +13,6 @@
 
 	let selectedPeriod = $state<'3months' | '30days' | '7days'>('3months');
 	let chartCanvas: HTMLCanvasElement;
-	let chartInstance: any = null;
 
 	// Sample data - replace with real data
 	const chartData = {
@@ -35,19 +33,30 @@
 		}
 	};
 
-	async function initChart() {
-		if (typeof window === 'undefined') return;
-
-		const { Chart, registerables } = await import('chart.js');
-		Chart.register(...registerables);
-
-		if (chartInstance) {
-			chartInstance.destroy();
-		}
-
+	// Draws the chart once the component is mounted, then again whenever selectedPeriod
+	// changes. Effects only run in the browser, so chart.js never loads on the server.
+	$effect(() => {
 		const data = chartData[selectedPeriod];
+		let chart: import('chart.js').Chart | undefined;
+		let cancelled = false;
 
-		chartInstance = new Chart(chartCanvas, {
+		import('chart.js').then(({ Chart, registerables }) => {
+			// The period changed or the component unmounted while chart.js was loading
+			if (cancelled) return;
+
+			Chart.register(...registerables);
+			chart = createChart(Chart, data);
+		});
+
+		// Runs before the next draw and when the component unmounts
+		return () => {
+			cancelled = true;
+			chart?.destroy();
+		};
+	});
+
+	function createChart(Chart: typeof import('chart.js').Chart, data: (typeof chartData)[keyof typeof chartData]) {
+		return new Chart(chartCanvas, {
 			type: 'line',
 			data: {
 				labels: data.labels,
@@ -102,23 +111,6 @@
 			}
 		});
 	}
-
-	onMount(() => {
-		initChart();
-		return () => {
-			if (chartInstance) {
-				chartInstance.destroy();
-			}
-		};
-	});
-
-	$effect(() => {
-		// Re-render chart when period changes
-		selectedPeriod;
-		if (chartCanvas) {
-			initChart();
-		}
-	});
 </script>
 
 <Card class={cn('', className)}>
