@@ -1,7 +1,7 @@
 // Technology brand icons using official Simple Icons SVG paths with brand colors
 export { default as BunIcon } from './bun-icon.svelte';
 export { default as SvelteKitIcon } from './sveltekit-icon.svelte';
-export { default as TursoIcon } from './turso-icon.svelte';
+export { default as PostgresIcon } from './postgres-icon.svelte';
 export { default as BetterAuthIcon } from './better-auth-icon.svelte';
 export { default as StripeIcon } from './stripe-icon.svelte';
 export { default as ResendIcon } from './resend-icon.svelte';
@@ -12,7 +12,7 @@ export { default as FlyIcon } from './fly-icon.svelte';
 export const brandColors = {
 	bun: '#000000',
 	svelte: '#FF3E00',
-	turso: '#4FF8D2',
+	postgresql: '#4169E1',
 	stripe: '#635BFF',
 	resend: '#000000',
 	flyio: '#24175B',

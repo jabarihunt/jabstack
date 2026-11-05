@@ -8,8 +8,11 @@ const baseURL = `http://localhost:${port}`;
 // They take precedence over any local .env file.
 const testEnv = {
 	PUBLIC_APP_URL: baseURL,
-	DATABASE_URL: 'file:acceptance-test.db',
-	DATABASE_AUTH_TOKEN: '',
+	// A PGlite folder of its own, so the tests can run while `bun run dev` is using
+	// .pglite/dev. Set ACCEPTANCE_DATABASE_URL to a postgres:// URL to test against a server.
+	DATABASE_URL: process.env.ACCEPTANCE_DATABASE_URL || 'file:.pglite/acceptance',
+	// Keeps drizzle-kit from migrating a database named in .env instead
+	DATABASE_MIGRATION_URL: '',
 	BETTER_AUTH_SECRET: 'acceptance-test-secret-not-used-in-production',
 	GOOGLE_CLIENT_ID: 'acceptance-test-google-client-id',
 	GOOGLE_CLIENT_SECRET: 'acceptance-test-google-client-secret',

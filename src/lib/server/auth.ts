@@ -11,7 +11,7 @@ import { PUBLIC_APP_URL } from '$app/env/public';
 
 export const auth = betterAuth({
 	database: drizzleAdapter(db, {
-		provider: 'sqlite',
+		provider: 'pg',
 		schema,
 		// Tables are exported as `users`, `sessions`, `accounts` and `verifications`
 		usePlural: true

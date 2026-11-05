@@ -22,9 +22,8 @@ Thumbs.db
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-# Database
-*.db
-*.db-journal
+# Database (local PGlite folders)
+/.pglite/
 
 # IDE
 .idea

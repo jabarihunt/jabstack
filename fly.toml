@@ -6,6 +6,8 @@
 #   2. PUBLIC_APP_URL - Your production URL
 
 app = 'jabstack'
+# Run the app in the Fly region closest to your database. iad (Ashburn, Virginia)
+# is next to AWS us-east-1, where many hosted databases run.
 primary_region = 'iad'
 
 [build]
@@ -15,7 +17,7 @@ primary_region = 'iad'
   PUBLIC_APP_URL = "https://jabstack.fly.dev"
 
 # Apply database migrations before each release goes live.
-# Runs in a temporary Machine with the app's secrets (DATABASE_URL, DATABASE_AUTH_TOKEN).
+# Runs in a temporary Machine with the app's secrets, so it uses the same database settings.
 # If it fails, the deploy stops and the current version keeps running.
 [deploy]
   release_command = "bun run db:migrate"

@@ -1,0 +1,548 @@
+diff --git a/.dockerignore b/.dockerignore
+index f2d4555..95405f0 100644
+--- a/.dockerignore
++++ b/.dockerignore
+@@ -9,7 +9,8 @@ build
+ !.env.example
+ 
+ # Local data and tooling
+-.pglite
++*.db
++*.db-journal
+ .git
+ .vscode
+ .idea
+diff --git a/.env.example b/.env.example
+index 79eb9b3..9557b93 100644
+--- a/.env.example
++++ b/.env.example
+@@ -2,22 +2,11 @@
+ NODE_ENV=development
+ PUBLIC_APP_URL=http://localhost:5173
+ 
+-# Database - PostgreSQL
+-# Locally, PGlite (Postgres in WebAssembly) keeps the database in a folder: file:.pglite/dev
+-# Only one process can use the folder at a time, so stop `bun run dev` before
+-# running `bun run db:migrate` or `bun run db:studio`.
+-# In production, use the connection string from your Postgres host (Neon, Supabase,
+-# Railway, AWS RDS, your own server). Add ?sslmode=require if the host needs SSL:
+-#   postgres://user:password@host:5432/database?sslmode=require
+-DATABASE_URL=file:.pglite/dev
+-# Optional. When set, migrations (bun run db:migrate) use it instead of DATABASE_URL.
+-# Where DATABASE_URL is a pooled connection (for example in Fly secrets), set this to
+-# the host's direct connection. Leave it empty locally.
+-DATABASE_MIGRATION_URL=
+-# Optional, defaults to true. Set to false if DATABASE_URL goes through a pooler in
+-# transaction mode that rejects prepared statements (Supabase on port 6543).
+-# Neon's pooled connections accept them.
+-# DATABASE_PREPARED_STATEMENTS=false
++# Database - Turso (production) / SQLite (local)
++# For local development, use: file:local.db
++# For Turso, use: libsql://your-database.turso.io
++DATABASE_URL=file:local.db
++DATABASE_AUTH_TOKEN=
+ 
+ # Authentication - Better Auth
+ # Generate with: openssl rand -base64 32
+diff --git a/.gitignore b/.gitignore
+index 1bd6d28..2294af1 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -22,8 +22,9 @@ Thumbs.db
+ vite.config.js.timestamp-*
+ vite.config.ts.timestamp-*
+ 
+-# Database (local PGlite folders)
+-/.pglite/
++# Database
++*.db
++*.db-journal
+ 
+ # IDE
+ .idea
+diff --git a/.mcp/mcp.json b/.mcp/mcp.json
+index 47a38c1..9f1349b 100644
+--- a/.mcp/mcp.json
++++ b/.mcp/mcp.json
+@@ -7,6 +7,14 @@
+         "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY}"
+       }
+     },
++    "turso": {
++      "command": "bunx",
++      "args": ["--bun", "@turso/mcp"],
++      "env": {
++        "TURSO_DATABASE_URL": "${DATABASE_URL}",
++        "TURSO_AUTH_TOKEN": "${DATABASE_AUTH_TOKEN}"
++      }
++    },
+     "shadcn": {
+       "command": "bunx",
+       "args": ["--bun", "shadcn@latest", "mcp"]
+diff --git a/AGENTS.md b/AGENTS.md
+index 92627ec..503dded 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -15,7 +15,7 @@ This copy hasn't chosen its database yet. It's set up for PostgreSQL, and this f
+ | Runtime, package manager | Bun | `bun.lock`, `Dockerfile` |
+ | Framework | SvelteKit 3, Svelte 5 (runes), TypeScript 6, Vite 8 | `vite.config.ts` (SvelteKit config and Bun adapter), `src/routes/` |
+ | Environment variables | SvelteKit `defineEnvVars`, validated with Zod | `src/env.ts`, `.env.example` |
+-| Database | PostgreSQL on any host (postgres.js), PGlite locally, Drizzle ORM | `src/lib/server/db/`, `drizzle/`, `drizzle.config.ts` |
++| Database | SQLite locally, Turso in production, Drizzle ORM | `src/lib/server/db/`, `drizzle/`, `drizzle.config.ts` |
+ | Auth | Better Auth, Google OAuth only | `src/lib/server/auth.ts`, `src/lib/auth-client.ts` |
+ | Payments, email | Stripe, Resend | `src/lib/server/stripe.ts`, `src/lib/server/email.ts` |
+ | Dashboard UI | shadcn-svelte | `src/lib/components/ui/` |
+@@ -38,7 +38,7 @@ bun run test:unit    # Run Vitest once (bun run test starts watch mode)
+ bun run test:acceptance  # Build the app and run the Playwright tests against it
+ bun run test:criteria    # Check every acceptance criterion has a test (no browser needed)
+ bun run db:generate  # Write a migration to drizzle/ from schema.ts
+-bun run db:migrate   # Apply migrations to DATABASE_MIGRATION_URL, or DATABASE_URL if it's empty
++bun run db:migrate   # Apply migrations to DATABASE_URL
+ bun run db:push      # Push schema without a migration (prototyping only)
+ bun run db:studio    # Open Drizzle Studio
+ bun run stripe:cli   # Forward Stripe webhooks to localhost:5173/api/stripe/webhook
+@@ -99,11 +99,9 @@ scripts/                  # check-acceptance-criteria.ts (bun run test:criteria)
+ - Validate API input with Zod.
+ 
+ ### Database
+-- `DATABASE_URL` picks the driver in `src/lib/server/db/index.ts`. A `postgres://` URL connects with postgres.js and takes SSL settings from the URL (`?sslmode=require`). `file:.pglite/dev`, the local default, uses PGlite (Postgres in WebAssembly). PGlite is for development and tests only. After cloning, run `bun run db:migrate` to create the tables.
+-- Only one process can open a PGlite folder, and PGlite doesn't lock it, so a second one can corrupt it. Stop `bun run dev` before `bun run db:migrate` or `bun run db:studio`.
+-- With a pooled `DATABASE_URL`, set `DATABASE_MIGRATION_URL` to the host's direct connection. Set `DATABASE_PREPARED_STATEMENTS=false` for poolers in transaction mode that reject prepared statements (Supabase on port 6543).
++- Locally, `DATABASE_URL=file:local.db`. After cloning, run `bun run db:migrate` to create the tables.
+ - Query with Drizzle's type-safe query builder rather than raw SQL.
+-- The schema is in `src/lib/server/db/schema.ts`. Create timestamp columns with its `timestampTz` helper, and export row types next to each table (`typeof table.$inferSelect`), like the existing ones.
++- The schema is in `src/lib/server/db/schema.ts`. Export row types next to each table (`typeof table.$inferSelect`), like the existing ones.
+ - After a schema change, run `bun run db:generate` and `bun run db:migrate`, then commit the new files in `drizzle/`. On Fly.io, `release_command` in `fly.toml` runs `bun run db:migrate` before each release.
+ - `users`, `sessions`, `accounts` and `verifications` belong to Better Auth, which checks them against its expected schema at startup. After upgrading Better Auth or adding a Better Auth plugin, generate a reference copy and compare: `bunx auth generate --config src/lib/server/auth.ts --output /tmp/auth-schema.ts`.
+ 
+@@ -152,12 +150,12 @@ Create `src/routes/<name>/+page.svelte` with Bits UI and custom Tailwind styling
+ 3. Test what a user sees and does: use `page.getByRole`, `getByText` and URLs, not CSS classes.
+ 4. Run `bun run test:criteria` and `bun run test:acceptance`. Run one criterion with `bun run test:acceptance --grep "AC-NN:"`.
+ 
+-The tests run against a production build served by `vite preview` on port 4173, using placeholder settings from `playwright.config.ts` and their own PGlite folder (`.pglite/acceptance`). They must never call Google, Stripe or Resend. Running them replaces `build/` with a test build.
++The tests run against a production build served by `vite preview` on port 4173, using placeholder settings from `playwright.config.ts` and a separate `acceptance-test.db`. They must never call Google, Stripe or Resend. Running them replaces `build/` with a test build.
+ 
+ ### Add a unit test
+ Put unit tests next to the code they cover as `<name>.test.ts`. Mock `$app/env/private`, `$app/env/public` and external SDKs with `vi.mock`, as `src/lib/server/email.test.ts` and `stripe.test.ts` do. Tests never call real services. Every test must make at least one `expect` call (`requireAssertions` is on).
+ 
+-`src/lib/server/db/database.test.ts` runs the migrations and Better Auth against in-memory PGlite. Set `TEST_DATABASE_URL` to a `postgres://` URL to run it against a server.
++`src/lib/server/db/database.test.ts` runs the migrations and Better Auth against an in-memory SQLite database.
+ 
+ ### Add an API endpoint
+ Create `src/routes/api/<name>/+server.ts`, export method handlers (`GET`, `POST`), validate input with Zod and return `Response.json(...)`. SvelteKit 3 deprecates its `json()` helper. There's no Stripe webhook endpoint yet. `stripe:cli` expects one at `src/routes/api/stripe/webhook/+server.ts`.
+@@ -204,4 +202,4 @@ The Bun adapter assumes requests arrived over HTTPS, which is true behind Fly's
+ 
+ ## Notes
+ 
+-- `.mcp/mcp.json` configures Stripe, shadcn and Svelte MCP servers. It has no database server, because Postgres hosts each publish their own (Neon and Supabase do).
++- `.mcp/mcp.json` configures Stripe, Turso, shadcn and Svelte MCP servers.
+diff --git a/README.md b/README.md
+index 553b76a..c95f11e 100644
+--- a/README.md
++++ b/README.md
+@@ -1,12 +1,12 @@
+ # JabStack
+ 
+-A modern, full-stack starter template for personal projects. Built with SvelteKit, PostgreSQL, Better Auth, Stripe, and deployed on Fly.io.
++A modern, full-stack starter template for personal projects. Built with SvelteKit, Turso, Better Auth, Stripe, and deployed on Fly.io.
+ 
+ ## Features
+ 
+ - **Bun** - Fast JavaScript runtime and package manager
+ - **SvelteKit 3** - Full-stack web framework with SSR/SSG/SPA support, on Vite 8
+-- **PostgreSQL** - Any Postgres host in production, PGlite (Postgres in WebAssembly) for local development and tests
++- **Turso/SQLite** - LibSQL for production, SQLite for local development
+ - **Better Auth** - Modern authentication with Google OAuth
+ - **Stripe** - Helpers for subscription checkout, the billing portal and customers (no checkout route or webhook endpoint yet)
+ - **Resend** - Transactional email templates (welcome, subscription confirmed, subscription cancelled)
+@@ -38,14 +38,14 @@ The command keeps only the chosen database's code and docs, then deletes `templa
+ 6. bun run dev
+ ```
+ 
+-`bun run db:migrate` creates a PGlite database in `.pglite/dev` and its tables, so you don't need a Postgres server to start. The app runs at `http://localhost:5173`. Auth and payments won't work until you configure the API keys in `.env`.
++`bun run db:migrate` creates `local.db` and its tables. The app runs at `http://localhost:5173` with SQLite out of the box. Auth and payments won't work until you configure the API keys in `.env`.
+ 
+ ## Full Setup
+ 
+ ### Prerequisites
+ 
+ - [Bun](https://bun.sh) installed
+-- A PostgreSQL database from any host (for production)
++- [Turso CLI](https://docs.turso.tech/cli/installation) (optional, for production database)
+ - [Stripe CLI](https://docs.stripe.com/stripe-cli) (optional, for local webhook testing)
+ - [Fly CLI](https://fly.io/docs/hands-on/install-flyctl/) (optional, for deployment)
+ 
+@@ -56,9 +56,8 @@ Every variable is declared and validated in `src/env.ts`. The app refuses to sta
+ | Variable | Required For | Get From |
+ |----------|--------------|----------|
+ | `PUBLIC_APP_URL` | Auth callbacks, email links | The URL you open the app at (`http://localhost:5173` locally) |
+-| `DATABASE_URL` | Database | `file:.pglite/dev` locally. In production, your Postgres host's connection string |
+-| `DATABASE_MIGRATION_URL` | Migrations, when `DATABASE_URL` is pooled (optional) | Your host's direct connection string |
+-| `DATABASE_PREPARED_STATEMENTS` | Poolers that reject prepared statements (optional) | `false` for Supabase's pooler on port 6543. Defaults to `true` |
++| `DATABASE_URL` | Database | `file:local.db` locally. In production, `turso db show <database> --url` |
++| `DATABASE_AUTH_TOKEN` | Turso (empty for a local file) | `turso db tokens create <database>` |
+ | `BETTER_AUTH_SECRET` | Auth | `openssl rand -base64 32` |
+ | `GOOGLE_CLIENT_ID` | Google OAuth | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
+ | `GOOGLE_CLIENT_SECRET` | Google OAuth | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
+@@ -124,7 +123,7 @@ bun run db:studio    # Open Drizzle Studio
+ bun run stripe:cli   # Forward Stripe webhooks to localhost:5173/api/stripe/webhook
+ ```
+ 
+-Unit tests live next to the code they cover (`src/**/*.test.ts`) and mock external services, so they run without API keys. `.env.test` supplies the one value Vitest needs when there's no `.env`. `src/lib/server/db/database.test.ts` runs the migrations and Better Auth against in-memory PGlite. Set `TEST_DATABASE_URL` to a `postgres://` URL to run it against a server.
++Unit tests live next to the code they cover (`src/**/*.test.ts`) and mock external services, so they run without API keys. `.env.test` supplies the one value Vitest needs when there's no `.env`. `src/lib/server/db/database.test.ts` runs the migrations and Better Auth against an in-memory SQLite database.
+ 
+ Acceptance tests live in `tests/acceptance/`. Each test's title starts with the ID of a criterion in `tests/acceptance/criteria.md`, such as `AC-03: ...`, and `test:criteria` fails if any criterion has no test. `test:acceptance` installs Chromium if needed, builds the app with placeholder settings and serves it on port 4173. Running it replaces `build/` with that test build.
+ 
+@@ -162,7 +161,7 @@ signOut();
+ ## Database
+ 
+ ### Local Development
+-`DATABASE_URL=file:.pglite/dev` keeps the database in the `.pglite/dev` folder with [PGlite](https://pglite.dev), Postgres compiled to WebAssembly. Only one process can use the folder at a time, and PGlite doesn't lock it, so two processes can corrupt it. Stop `bun run dev` before running `bun run db:migrate` or `bun run db:studio`.
++Uses SQLite file (`local.db`) for simplicity.
+ 
+ ### Migrations
+ Migrations are SQL files in `drizzle/` and are committed to git. After changing `src/lib/server/db/schema.ts`:
+@@ -175,9 +174,18 @@ bun run db:migrate   # Apply it to the database in DATABASE_URL
+ Commit the new files in `drizzle/` with the schema change. On Fly.io, the `release_command` in `fly.toml` runs `bun run db:migrate` against your production database before each release goes live.
+ 
+ ### Production
+-Any Postgres host works, such as Neon, Supabase, Railway, AWS RDS or your own server. Set `DATABASE_URL` to its connection string, and add `?sslmode=require` if the host needs SSL. postgres.js reads the SSL setting from the URL.
++Uses [Turso](https://turso.tech) (libSQL) for edge-distributed database.
+ 
+-If the host offers a pooled and a direct connection string, use the pooled one for `DATABASE_URL` and the direct one for `DATABASE_MIGRATION_URL`. Neon's pooler accepts prepared statements. Supabase's pooler on port 6543 doesn't, so set `DATABASE_PREPARED_STATEMENTS=false` there.
++```bash
++# Create Turso database
++turso db create jabstack
++
++# Get connection URL
++turso db show jabstack --url
++
++# Get auth token
++turso db tokens create jabstack
++```
+ 
+ Run the app in the Fly region closest to the database (`primary_region` in `fly.toml`).
+ 
+@@ -198,7 +206,7 @@ The app reads its secrets when it starts. Set every variable in `src/env.ts` as
+ fly apps create your-app-name
+ 
+ # Set secrets
+-fly secrets set DATABASE_URL=postgres://... DATABASE_MIGRATION_URL=postgres://...
++fly secrets set DATABASE_URL=libsql://... DATABASE_AUTH_TOKEN=...
+ fly secrets set BETTER_AUTH_SECRET=...
+ fly secrets set GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=...
+ fly secrets set STRIPE_SECRET_KEY=... STRIPE_WEBHOOK_SECRET=... PUBLIC_STRIPE_PUBLISHABLE_KEY=...
+@@ -213,10 +221,11 @@ fly deploy
+ JabStack includes MCP server configurations for AI-assisted development:
+ 
+ - **Stripe MCP** - Query Stripe data, manage products/prices
++- **Turso MCP** - Query database, explore schema
+ - **shadcn MCP** - Browse, search, and install shadcn-svelte components via natural language
+ - **Svelte MCP** - Provides Svelte/SvelteKit documentation context and static analysis for better code generation
+ 
+-See `.mcp/mcp.json` for configuration. There's no database MCP server, because each Postgres host has its own. Neon and Supabase both publish one you can add.
++See `.mcp/mcp.json` for configuration.
+ 
+ ## Documentation
+ 
+diff --git a/plans/jabstack-architecture.md b/plans/jabstack-architecture.md
+index 8ae6fb3..4fc0059 100644
+--- a/plans/jabstack-architecture.md
++++ b/plans/jabstack-architecture.md
+@@ -11,7 +11,7 @@ JabStack is a modern, full-stack starter template designed for personal projects
+ | Runtime | Bun | Fast JavaScript runtime, package manager, and bundler |
+ | Language | TypeScript | Type-safe JavaScript |
+ | Framework | SvelteKit | Full-stack web framework with SSR/SSG/SPA support |
+-| Database | PostgreSQL / PGlite | Any Postgres host in production through postgres.js, PGlite for local development and tests |
++| Database | Turso / SQLite | LibSQL for production, SQLite for local development |
+ | ORM | Drizzle | Type-safe SQL ORM with excellent DX |
+ | Auth | Better Auth | Modern auth library with OAuth support |
+ | Payments | Stripe | Payment processing |
+@@ -117,7 +117,7 @@ flowchart TB
+     end
+ 
+     subgraph External[External Services]
+-        Database[(PostgreSQL)]
++        Turso[(Turso DB)]
+         Google[Google OAuth]
+         StripeAPI[Stripe API]
+         ResendAPI[Resend API]
+@@ -132,7 +132,7 @@ flowchart TB
+     Marketing --> Components
+     Dashboard --> Components
+     API --> ServerLib
+-    ServerLib --> Database
++    ServerLib --> Turso
+     ServerLib --> Google
+     ServerLib --> StripeAPI
+     ServerLib --> ResendAPI
+@@ -147,7 +147,7 @@ sequenceDiagram
+     participant S as SvelteKit
+     participant A as Better Auth
+     participant G as Google OAuth
+-    participant D as PostgreSQL
++    participant D as Turso DB
+     participant St as Stripe
+     participant E as Resend
+ 
+@@ -250,15 +250,14 @@ erDiagram
+     users ||--o{ subscriptions : has
+ ```
+ 
+-`users`, `sessions`, `accounts` and `verifications` are Better Auth's tables (`verifications` holds short-lived values such as OAuth state). Better Auth checks them against its expected schema at startup. Timestamps are `timestamp with time zone` columns.
++`users`, `sessions`, `accounts` and `verifications` are Better Auth's tables (`verifications` holds short-lived values such as OAuth state). Better Auth checks them against its expected schema at startup. Timestamps are stored as milliseconds.
+ 
+ ## Environment Variables
+ 
+ ```bash
+ # Database
+-DATABASE_URL=               # Postgres connection string, or file:.pglite/dev for PGlite
+-DATABASE_MIGRATION_URL=     # Optional direct connection string for migrations
+-DATABASE_PREPARED_STATEMENTS=  # Optional, default true. false for poolers that reject them
++DATABASE_URL=               # Turso database URL - libsql://...
++DATABASE_AUTH_TOKEN=        # Turso auth token
+ 
+ # Auth
+ BETTER_AUTH_SECRET=         # Random secret for session encryption
+@@ -324,7 +323,7 @@ export const variables = defineEnvVars({
+ 		schema: z.url('PUBLIC_APP_URL must be a valid URL')
+ 	},
+ 	DATABASE_URL: {
+-		schema: secret(z.string().regex(/^(postgres(ql)?:\/\/|file:|memory:\/\/$)/), 'memory://')
++		schema: secret(z.string().min(1, 'DATABASE_URL is required'), ':memory:')
+ 	},
+ 	STRIPE_SECRET_KEY: {
+ 		schema: secret(z.string().startsWith('sk_', 'STRIPE_SECRET_KEY must start with sk_'), 'sk_build_placeholder')
+@@ -340,28 +339,27 @@ export const variables = defineEnvVars({
+ 
+ ### 3. Database Setup with Drizzle
+ 
+-PGlite for development and tests (`DATABASE_URL=file:.pglite/dev`), any Postgres host in production. `DATABASE_URL` picks the driver:
++Local SQLite file for development (`DATABASE_URL=file:local.db`), Turso for production:
+ 
+ ```typescript
+-// src/lib/server/db/index.ts (abridged)
+-function createClient(url: string): Client {
+-	if (/^postgres(ql)?:\/\//.test(url)) {
+-		// SSL settings come from the URL, e.g. ?sslmode=require
+-		return postgres(url, { prepare: DATABASE_PREPARED_STATEMENTS });
+-	}
+-	// file:<folder> or memory://: Postgres compiled to WebAssembly, in this process
+-	return new PGlite(url.replace(/^file:/, ''));
+-}
++// src/lib/server/db/index.ts
++import { drizzle } from 'drizzle-orm/libsql';
++import { createClient } from '@libsql/client';
++import { DATABASE_URL, DATABASE_AUTH_TOKEN } from '$app/env/private';
++import * as schema from './schema.js';
++
++const client = createClient({
++	url: DATABASE_URL,
++	authToken: DATABASE_AUTH_TOKEN || undefined
++});
+ 
+-// The build never queries, so it gets a postgres.js client that never connects
+-export const db = building ? connect('postgres://build-placeholder@localhost/build') : connect(DATABASE_URL);
+-```
++export const db = drizzle(client, { schema });
+ 
+-- `connect()` keeps each client on `globalThis`, so a Vite reload during development doesn't open a second PGlite on the same folder. PGlite doesn't lock its folder, and two processes using it can corrupt it.
+-- On `sveltekit:shutdown`, which the Bun adapter emits after SIGTERM or SIGINT, the client closes so the process can exit.
+-- `prepare: false` (`DATABASE_PREPARED_STATEMENTS=false`) is for poolers in transaction mode that reject prepared statements, such as Supabase's on port 6543.
++// Re-export schema for convenience
++export * from './schema.js';
++```
+ 
+-`drizzle.config.ts` uses the `postgresql` dialect. It connects with `DATABASE_MIGRATION_URL` if set, otherwise `DATABASE_URL`, through postgres.js for a `postgres://` URL or the `pglite` driver for a `file:` URL. Migrations are generated into `drizzle/` and committed.
++`drizzle.config.ts` uses the `turso` dialect, which works with both a `file:` URL and a Turso URL plus auth token. Migrations are generated into `drizzle/` and committed.
+ 
+ ### 4. Better Auth Configuration
+ 
+@@ -374,7 +372,7 @@ import * as schema from './db/schema.js';
+ 
+ export const auth = betterAuth({
+   database: drizzleAdapter(db, {
+-    provider: 'pg',
++    provider: 'sqlite',
+     schema,
+     usePlural: true // tables are users, sessions, accounts, verifications
+   }),
+@@ -422,15 +420,16 @@ CMD ["bun", "./build/index.js"]
+ - `fly.toml` passes `PUBLIC_APP_URL` as a build argument, because it's a static variable written into the build. The build needs no other variables.
+ - `.dockerignore` keeps `.env`, `node_modules`, `.svelte-kit`, local databases and `.git` out of the build context.
+ - Secrets come from `fly secrets set` and are read when the server starts.
+-- `release_command = "bun run db:migrate"` in `fly.toml` applies migrations in a temporary Machine before each release goes live. It uses the app's secrets: `DATABASE_MIGRATION_URL` if set, otherwise `DATABASE_URL`. That's why the runtime image includes `drizzle/`, `drizzle.config.ts` and all of `node_modules` (drizzle-kit is a dev dependency).
++- `release_command = "bun run db:migrate"` in `fly.toml` applies migrations in a temporary Machine before each release goes live. It reads the same `DATABASE_URL` secret as the app. That's why the runtime image includes `drizzle/`, `drizzle.config.ts` and all of `node_modules` (drizzle-kit is a dev dependency).
+ 
+ ## MCP Server Configurations
+ 
+-`.mcp/mcp.json` runs three MCP servers with `bunx --bun`:
++`.mcp/mcp.json` runs four MCP servers with `bunx --bun`:
+ 
+ | Server | Package | Uses |
+ |--------|---------|------|
+ | `stripe` | `@stripe/mcp --tools=all` | `STRIPE_SECRET_KEY`. All tools are enabled, so consider a restricted key |
++| `turso` | `@turso/mcp` | `DATABASE_URL`, `DATABASE_AUTH_TOKEN` |
+ | `shadcn` | `shadcn@latest mcp` | Nothing |
+ | `svelte` | `sv mcp` | Nothing |
+ 
+@@ -471,13 +470,13 @@ All components use static placeholder data for flexibility across different proj
+ 
+ ## Deployment Checklist
+ 
+-1. Create a PostgreSQL database on any host and copy its connection strings (pooled and direct, if it has both)
++1. Create Turso database and get credentials
+ 2. Set up Google OAuth credentials, with `https://<your-app>.fly.dev/api/auth/callback/google` as an authorized redirect URI
+ 3. Create Stripe account and get API keys
+ 4. Create Resend account and get API key
+ 5. Set `app` and `PUBLIC_APP_URL` (under `[build.args]`) in `fly.toml`
+ 6. Create Fly.io app: `fly apps create <your-app>`
+-7. Set secrets: `fly secrets set DATABASE_URL=... DATABASE_MIGRATION_URL=...` and every other variable in `src/env.ts` except `PUBLIC_APP_URL`. The app won't start if one is missing.
++7. Set secrets: `fly secrets set DATABASE_URL=... DATABASE_AUTH_TOKEN=...` and every other variable in `src/env.ts` except `PUBLIC_APP_URL`. The app won't start if one is missing.
+ 8. Deploy: `fly deploy`. Migrations run automatically before the release goes live.
+ 
+ ## Next Steps After Setup
+@@ -486,7 +485,7 @@ When starting a new project from JabStack:
+ 
+ 1. Clone the repository
+ 2. Update `package.json` with new project name
+-3. Create a new PostgreSQL database for the project
++3. Create new Turso database for the project
+ 4. Update environment variables, then run `bun run db:migrate`
+ 5. Customize dashboard sidebar navigation in `app-sidebar.svelte`
+ 6. Modify database schema for project needs, then generate and commit a migration
+diff --git a/playwright.config.ts b/playwright.config.ts
+index 86970a8..66f1728 100644
+--- a/playwright.config.ts
++++ b/playwright.config.ts
+@@ -8,11 +8,8 @@ const baseURL = `http://localhost:${port}`;
+ // They take precedence over any local .env file.
+ const testEnv = {
+ 	PUBLIC_APP_URL: baseURL,
+-	// A PGlite folder of its own, so the tests can run while `bun run dev` is using
+-	// .pglite/dev. Set ACCEPTANCE_DATABASE_URL to a postgres:// URL to test against a server.
+-	DATABASE_URL: process.env.ACCEPTANCE_DATABASE_URL || 'file:.pglite/acceptance',
+-	// Keeps drizzle-kit from migrating a database named in .env instead
+-	DATABASE_MIGRATION_URL: '',
++	DATABASE_URL: 'file:acceptance-test.db',
++	DATABASE_AUTH_TOKEN: '',
+ 	BETTER_AUTH_SECRET: 'acceptance-test-secret-not-used-in-production',
+ 	GOOGLE_CLIENT_ID: 'acceptance-test-google-client-id',
+ 	GOOGLE_CLIENT_SECRET: 'acceptance-test-google-client-secret',
+diff --git a/src/env.ts b/src/env.ts
+index bfae78a..a2661b8 100644
+--- a/src/env.ts
++++ b/src/env.ts
+@@ -22,24 +22,12 @@ export const variables = defineEnvVars({
+ 		description: 'The URL the app is served from, e.g. http://localhost:5173. Better Auth builds callback URLs from it.'
+ 	},
+ 	DATABASE_URL: {
+-		schema: secret(
+-			z
+-				.string()
+-				.regex(
+-					/^(postgres(ql)?:\/\/|file:|memory:\/\/$)/,
+-					'DATABASE_URL must be a postgres:// URL, file:<folder> for PGlite, or memory://'
+-				),
+-			'memory://'
+-		),
+-		description: 'Postgres connection string from your host, or file:.pglite/dev for a local PGlite database.'
++		schema: secret(z.string().min(1, 'DATABASE_URL is required'), ':memory:'),
++		description: 'libSQL URL: file:local.db locally, libsql://... for Turso.'
+ 	},
+-	DATABASE_MIGRATION_URL: {
++	DATABASE_AUTH_TOKEN: {
+ 		schema: z.string().optional(),
+-		description: 'Optional direct (unpooled) connection string for migrations. Only drizzle.config.ts reads it.'
+-	},
+-	DATABASE_PREPARED_STATEMENTS: {
+-		schema: z.stringbool('DATABASE_PREPARED_STATEMENTS must be true or false').default(true),
+-		description: 'Set to false for poolers in transaction mode that reject prepared statements, such as Supabase on port 6543.'
++		description: 'Turso auth token. Leave empty for a local SQLite file.'
+ 	},
+ 	BETTER_AUTH_SECRET: {
+ 		schema: secret(
+diff --git a/src/lib/components/icons/index.ts b/src/lib/components/icons/index.ts
+index e193e72..4e2c962 100644
+--- a/src/lib/components/icons/index.ts
++++ b/src/lib/components/icons/index.ts
+@@ -1,7 +1,7 @@
+ // Technology brand icons using official Simple Icons SVG paths with brand colors
+ export { default as BunIcon } from './bun-icon.svelte';
+ export { default as SvelteKitIcon } from './sveltekit-icon.svelte';
+-export { default as PostgresIcon } from './postgres-icon.svelte';
++export { default as TursoIcon } from './turso-icon.svelte';
+ export { default as BetterAuthIcon } from './better-auth-icon.svelte';
+ export { default as StripeIcon } from './stripe-icon.svelte';
+ export { default as ResendIcon } from './resend-icon.svelte';
+@@ -12,7 +12,7 @@ export { default as FlyIcon } from './fly-icon.svelte';
+ export const brandColors = {
+ 	bun: '#000000',
+ 	svelte: '#FF3E00',
+-	postgresql: '#4169E1',
++	turso: '#4FF8D2',
+ 	stripe: '#635BFF',
+ 	resend: '#000000',
+ 	flyio: '#24175B',
+diff --git a/src/lib/server/auth.ts b/src/lib/server/auth.ts
+index cce2fa6..a7ce620 100644
+--- a/src/lib/server/auth.ts
++++ b/src/lib/server/auth.ts
+@@ -11,7 +11,7 @@ import { PUBLIC_APP_URL } from '$app/env/public';
+ 
+ export const auth = betterAuth({
+ 	database: drizzleAdapter(db, {
+-		provider: 'pg',
++		provider: 'sqlite',
+ 		schema,
+ 		// Tables are exported as `users`, `sessions`, `accounts` and `verifications`
+ 		usePlural: true
+diff --git a/src/routes/+page.svelte b/src/routes/+page.svelte
+index 39d356e..0ff72eb 100644
+--- a/src/routes/+page.svelte
++++ b/src/routes/+page.svelte
+@@ -3,7 +3,7 @@
+ 	import {
+ 		BunIcon,
+ 		SvelteKitIcon,
+-		PostgresIcon,
++		TursoIcon,
+ 		BetterAuthIcon,
+ 		StripeIcon,
+ 		ResendIcon,
+@@ -14,7 +14,7 @@
+ 	const techStack = [
+ 		{ name: 'Bun', description: 'Runtime', icon: BunIcon },
+ 		{ name: 'SvelteKit', description: 'Framework', icon: SvelteKitIcon },
+-		{ name: 'PostgreSQL', description: 'Database', icon: PostgresIcon },
++		{ name: 'Turso', description: 'Database', icon: TursoIcon },
+ 		{ name: 'Better Auth', description: 'Authentication', icon: BetterAuthIcon },
+ 		{ name: 'Stripe', description: 'Payments', icon: StripeIcon },
+ 		{ name: 'Resend', description: 'Email', icon: ResendIcon },
+@@ -25,7 +25,7 @@
+ 
+ <svelte:head>
+ 	<title>JabStack - Modern Full-Stack Starter Template</title>
+-	<meta name="description" content="JabStack is a modern, full-stack starter template for personal projects with SvelteKit, PostgreSQL, Better Auth, Stripe, and more." />
++	<meta name="description" content="JabStack is a modern, full-stack starter template for personal projects with SvelteKit, Turso, Better Auth, Stripe, and more." />
+ 	<meta property="og:title" content="JabStack - Modern Full-Stack Starter Template" />
+ 	<meta property="og:description" content="Build your next project faster with JabStack. Includes authentication, payments, dashboard, and more." />
+ 	<meta property="og:type" content="website" />
+@@ -62,7 +62,7 @@
+ 				Welcome to <span class="text-emerald-600">JabStack</span>
+ 			</h1>
+ 			<p class="mt-6 text-xl text-zinc-600">
+-				A modern, full-stack starter template for personal projects. Built with SvelteKit, PostgreSQL, Better Auth, Stripe, and deployed on Fly.io.
++				A modern, full-stack starter template for personal projects. Built with SvelteKit, Turso, Better Auth, Stripe, and deployed on Fly.io.
+ 			</p>
+ 			<div class="mt-10 flex items-center justify-center gap-4">
+ 				<Button.Root
+@@ -120,7 +120,7 @@
+ 				<div class="rounded-lg border border-zinc-200 p-6">
+ 					<h3 class="text-lg font-semibold">Database</h3>
+ 					<p class="mt-2 text-zinc-600">
+-						PostgreSQL on any host, with PGlite for local development. Type-safe with Drizzle ORM.
++						SQLite locally, Turso in production. Type-safe with Drizzle ORM.
+ 					</p>
+ 				</div>
+ 				<div class="rounded-lg border border-zinc-200 p-6">

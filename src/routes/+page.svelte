@@ -3,7 +3,7 @@
 	import {
 		BunIcon,
 		SvelteKitIcon,
-		TursoIcon,
+		PostgresIcon,
 		BetterAuthIcon,
 		StripeIcon,
 		ResendIcon,
@@ -14,7 +14,7 @@
 	const techStack = [
 		{ name: 'Bun', description: 'Runtime', icon: BunIcon },
 		{ name: 'SvelteKit', description: 'Framework', icon: SvelteKitIcon },
-		{ name: 'Turso', description: 'Database', icon: TursoIcon },
+		{ name: 'PostgreSQL', description: 'Database', icon: PostgresIcon },
 		{ name: 'Better Auth', description: 'Authentication', icon: BetterAuthIcon },
 		{ name: 'Stripe', description: 'Payments', icon: StripeIcon },
 		{ name: 'Resend', description: 'Email', icon: ResendIcon },
@@ -25,7 +25,7 @@
 
 <svelte:head>
 	<title>JabStack - Modern Full-Stack Starter Template</title>
-	<meta name="description" content="JabStack is a modern, full-stack starter template for personal projects with SvelteKit, Turso, Better Auth, Stripe, and more." />
+	<meta name="description" content="JabStack is a modern, full-stack starter template for personal projects with SvelteKit, PostgreSQL, Better Auth, Stripe, and more." />
 	<meta property="og:title" content="JabStack - Modern Full-Stack Starter Template" />
 	<meta property="og:description" content="Build your next project faster with JabStack. Includes authentication, payments, dashboard, and more." />
 	<meta property="og:type" content="website" />
@@ -62,7 +62,7 @@
 				Welcome to <span class="text-emerald-600">JabStack</span>
 			</h1>
 			<p class="mt-6 text-xl text-zinc-600">
-				A modern, full-stack starter template for personal projects. Built with SvelteKit, Turso, Better Auth, Stripe, and deployed on Fly.io.
+				A modern, full-stack starter template for personal projects. Built with SvelteKit, PostgreSQL, Better Auth, Stripe, and deployed on Fly.io.
 			</p>
 			<div class="mt-10 flex items-center justify-center gap-4">
 				<Button.Root
@@ -120,7 +120,7 @@
 				<div class="rounded-lg border border-zinc-200 p-6">
 					<h3 class="text-lg font-semibold">Database</h3>
 					<p class="mt-2 text-zinc-600">
-						SQLite locally, Turso in production. Type-safe with Drizzle ORM.
+						PostgreSQL on any host, with PGlite for local development. Type-safe with Drizzle ORM.
 					</p>
 				</div>
 				<div class="rounded-lg border border-zinc-200 p-6">

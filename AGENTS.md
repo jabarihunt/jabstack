@@ -2,6 +2,12 @@
 
 JabStack is a SvelteKit starter template. Each new project starts as a copy of it and then diverges. It includes a marketing home page, a dashboard, Google sign-in, Stripe and Resend helpers, and Fly.io deployment. Architecture diagrams are in `plans/jabstack-architecture.md`.
 
+<!-- scaffold:start -->
+## Choosing the database
+
+This copy hasn't chosen its database yet. It's set up for PostgreSQL, and this file describes PostgreSQL. Before making other changes, run `bun run setup:database postgres` to keep PostgreSQL, or `bun run setup:database turso` for SQLite locally and Turso in production. The command keeps only the chosen database's code and docs, then deletes `templates/`, `.github/workflows/scaffold.yml`, itself and this section.
+<!-- scaffold:end -->
+
 ## Stack
 
 | Layer | Technology | Key files |
@@ -9,7 +15,7 @@ JabStack is a SvelteKit starter template. Each new project starts as a copy of i
 | Runtime, package manager | Bun | `bun.lock`, `Dockerfile` |
 | Framework | SvelteKit 3, Svelte 5 (runes), TypeScript 6, Vite 8 | `vite.config.ts` (SvelteKit config and Bun adapter), `src/routes/` |
 | Environment variables | SvelteKit `defineEnvVars`, validated with Zod | `src/env.ts`, `.env.example` |
-| Database | SQLite locally, Turso in production, Drizzle ORM | `src/lib/server/db/`, `drizzle/`, `drizzle.config.ts` |
+| Database | PostgreSQL on any host (postgres.js), PGlite locally, Drizzle ORM | `src/lib/server/db/`, `drizzle/`, `drizzle.config.ts` |
 | Auth | Better Auth, Google OAuth only | `src/lib/server/auth.ts`, `src/lib/auth-client.ts` |
 | Payments, email | Stripe, Resend | `src/lib/server/stripe.ts`, `src/lib/server/email.ts` |
 | Dashboard UI | shadcn-svelte | `src/lib/components/ui/` |
@@ -32,7 +38,7 @@ bun run test:unit    # Run Vitest once (bun run test starts watch mode)
 bun run test:acceptance  # Build the app and run the Playwright tests against it
 bun run test:criteria    # Check every acceptance criterion has a test (no browser needed)
 bun run db:generate  # Write a migration to drizzle/ from schema.ts
-bun run db:migrate   # Apply migrations to DATABASE_URL
+bun run db:migrate   # Apply migrations to DATABASE_MIGRATION_URL, or DATABASE_URL if it's empty
 bun run db:push      # Push schema without a migration (prototyping only)
 bun run db:studio    # Open Drizzle Studio
 bun run stripe:cli   # Forward Stripe webhooks to localhost:5173/api/stripe/webhook
@@ -93,9 +99,11 @@ scripts/                  # check-acceptance-criteria.ts (bun run test:criteria)
 - Validate API input with Zod.
 
 ### Database
-- Locally, `DATABASE_URL=file:local.db`. After cloning, run `bun run db:migrate` to create the tables.
+- `DATABASE_URL` picks the driver in `src/lib/server/db/index.ts`. A `postgres://` URL connects with postgres.js and takes SSL settings from the URL (`?sslmode=require`). `file:.pglite/dev`, the local default, uses PGlite (Postgres in WebAssembly). PGlite is for development and tests only. After cloning, run `bun run db:migrate` to create the tables.
+- Only one process can open a PGlite folder, and PGlite doesn't lock it, so a second one can corrupt it. Stop `bun run dev` before `bun run db:migrate` or `bun run db:studio`.
+- With a pooled `DATABASE_URL`, set `DATABASE_MIGRATION_URL` to the host's direct connection. Set `DATABASE_PREPARED_STATEMENTS=false` for poolers in transaction mode that reject prepared statements (Supabase on port 6543).
 - Query with Drizzle's type-safe query builder rather than raw SQL.
-- The schema is in `src/lib/server/db/schema.ts`. Export row types next to each table (`typeof table.$inferSelect`), like the existing ones.
+- The schema is in `src/lib/server/db/schema.ts`. Create timestamp columns with its `timestampTz` helper, and export row types next to each table (`typeof table.$inferSelect`), like the existing ones.
 - After a schema change, run `bun run db:generate` and `bun run db:migrate`, then commit the new files in `drizzle/`. On Fly.io, `release_command` in `fly.toml` runs `bun run db:migrate` before each release.
 - `users`, `sessions`, `accounts` and `verifications` belong to Better Auth, which checks them against its expected schema at startup. After upgrading Better Auth or adding a Better Auth plugin, generate a reference copy and compare: `bunx auth generate --config src/lib/server/auth.ts --output /tmp/auth-schema.ts`.
 
@@ -144,10 +152,12 @@ Create `src/routes/<name>/+page.svelte` with Bits UI and custom Tailwind styling
 3. Test what a user sees and does: use `page.getByRole`, `getByText` and URLs, not CSS classes.
 4. Run `bun run test:criteria` and `bun run test:acceptance`. Run one criterion with `bun run test:acceptance --grep "AC-NN:"`.
 
-The tests run against a production build served by `vite preview` on port 4173, using placeholder settings from `playwright.config.ts` and a separate `acceptance-test.db`. They must never call Google, Stripe or Resend. Running them replaces `build/` with a test build.
+The tests run against a production build served by `vite preview` on port 4173, using placeholder settings from `playwright.config.ts` and their own PGlite folder (`.pglite/acceptance`). They must never call Google, Stripe or Resend. Running them replaces `build/` with a test build.
 
 ### Add a unit test
 Put unit tests next to the code they cover as `<name>.test.ts`. Mock `$app/env/private`, `$app/env/public` and external SDKs with `vi.mock`, as `src/lib/server/email.test.ts` and `stripe.test.ts` do. Tests never call real services. Every test must make at least one `expect` call (`requireAssertions` is on).
+
+`src/lib/server/db/database.test.ts` runs the migrations and Better Auth against in-memory PGlite. Set `TEST_DATABASE_URL` to a `postgres://` URL to run it against a server.
 
 ### Add an API endpoint
 Create `src/routes/api/<name>/+server.ts`, export method handlers (`GET`, `POST`), validate input with Zod and return `Response.json(...)`. SvelteKit 3 deprecates its `json()` helper. There's no Stripe webhook endpoint yet. `stripe:cli` expects one at `src/routes/api/stripe/webhook/+server.ts`.
@@ -194,4 +204,4 @@ The Bun adapter assumes requests arrived over HTTPS, which is true behind Fly's 
 
 ## Notes
 
-- `.mcp/mcp.json` configures Stripe, Turso, shadcn and Svelte MCP servers.
+- `.mcp/mcp.json` configures Stripe, shadcn and Svelte MCP servers. It has no database server, because Postgres hosts each publish their own (Neon and Supabase do).

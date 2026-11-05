@@ -1,8 +1,9 @@
-import { relations, sql } from 'drizzle-orm';
-import { sqliteTable, text, integer, index } from 'drizzle-orm/sqlite-core';
+import { relations } from 'drizzle-orm';
+import { pgTable, text, timestamp, boolean, index } from 'drizzle-orm/pg-core';
 
-// Default for timestamp columns: the current time in milliseconds, set by SQLite
-const nowMs = sql`(cast(unixepoch('subsecond') * 1000 as integer))`;
+// Every timestamp is `timestamp with time zone`, so stored times don't depend on the
+// server's TimeZone setting. Better Auth's generated schema uses plain `timestamp`.
+const timestampTz = (name: string) => timestamp(name, { withTimezone: true });
 
 // ---------------------------------------------------------------------------
 // Better Auth tables
@@ -13,27 +14,27 @@ const nowMs = sql`(cast(unixepoch('subsecond') * 1000 as integer))`;
 //   bunx auth generate --config src/lib/server/auth.ts --output /tmp/auth-schema.ts
 // ---------------------------------------------------------------------------
 
-export const users = sqliteTable('users', {
+export const users = pgTable('users', {
 	id: text('id').primaryKey(),
 	name: text('name').notNull(),
 	email: text('email').notNull().unique(),
-	emailVerified: integer('email_verified', { mode: 'boolean' }).default(false).notNull(),
+	emailVerified: boolean('email_verified').default(false).notNull(),
 	image: text('image'),
-	createdAt: integer('created_at', { mode: 'timestamp_ms' }).default(nowMs).notNull(),
-	updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
-		.default(nowMs)
+	createdAt: timestampTz('created_at').defaultNow().notNull(),
+	updatedAt: timestampTz('updated_at')
+		.defaultNow()
 		.$onUpdate(() => new Date())
 		.notNull()
 });
 
-export const sessions = sqliteTable(
+export const sessions = pgTable(
 	'sessions',
 	{
 		id: text('id').primaryKey(),
-		expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+		expiresAt: timestampTz('expires_at').notNull(),
 		token: text('token').notNull().unique(),
-		createdAt: integer('created_at', { mode: 'timestamp_ms' }).default(nowMs).notNull(),
-		updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+		createdAt: timestampTz('created_at').defaultNow().notNull(),
+		updatedAt: timestampTz('updated_at')
 			.$onUpdate(() => new Date())
 			.notNull(),
 		ipAddress: text('ip_address'),
@@ -46,7 +47,7 @@ export const sessions = sqliteTable(
 );
 
 // OAuth provider accounts (and passwords, if email/password sign-in is enabled)
-export const accounts = sqliteTable(
+export const accounts = pgTable(
 	'accounts',
 	{
 		id: text('id').primaryKey(),
@@ -58,12 +59,12 @@ export const accounts = sqliteTable(
 		accessToken: text('access_token'),
 		refreshToken: text('refresh_token'),
 		idToken: text('id_token'),
-		accessTokenExpiresAt: integer('access_token_expires_at', { mode: 'timestamp_ms' }),
-		refreshTokenExpiresAt: integer('refresh_token_expires_at', { mode: 'timestamp_ms' }),
+		accessTokenExpiresAt: timestampTz('access_token_expires_at'),
+		refreshTokenExpiresAt: timestampTz('refresh_token_expires_at'),
 		scope: text('scope'),
 		password: text('password'),
-		createdAt: integer('created_at', { mode: 'timestamp_ms' }).default(nowMs).notNull(),
-		updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+		createdAt: timestampTz('created_at').defaultNow().notNull(),
+		updatedAt: timestampTz('updated_at')
 			.$onUpdate(() => new Date())
 			.notNull()
 	},
@@ -71,16 +72,16 @@ export const accounts = sqliteTable(
 );
 
 // Short-lived values such as OAuth state and email verification tokens
-export const verifications = sqliteTable(
+export const verifications = pgTable(
 	'verifications',
 	{
 		id: text('id').primaryKey(),
 		identifier: text('identifier').notNull(),
 		value: text('value').notNull(),
-		expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
-		createdAt: integer('created_at', { mode: 'timestamp_ms' }).default(nowMs).notNull(),
-		updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
-			.default(nowMs)
+		expiresAt: timestampTz('expires_at').notNull(),
+		createdAt: timestampTz('created_at').defaultNow().notNull(),
+		updatedAt: timestampTz('updated_at')
+			.defaultNow()
 			.$onUpdate(() => new Date())
 			.notNull()
 	},
@@ -111,7 +112,7 @@ export const accountsRelations = relations(accounts, ({ one }) => ({
 // ---------------------------------------------------------------------------
 
 // Subscriptions table - for Stripe subscriptions
-export const subscriptions = sqliteTable('subscriptions', {
+export const subscriptions = pgTable('subscriptions', {
 	id: text('id').primaryKey(),
 	userId: text('user_id')
 		.notNull()
@@ -121,13 +122,13 @@ export const subscriptions = sqliteTable('subscriptions', {
 	stripePriceId: text('stripe_price_id'),
 	status: text('status').notNull().default('inactive'),
 	plan: text('plan').default('free'),
-	currentPeriodStart: integer('current_period_start', { mode: 'timestamp_ms' }),
-	currentPeriodEnd: integer('current_period_end', { mode: 'timestamp_ms' }),
-	cancelAtPeriodEnd: integer('cancel_at_period_end', { mode: 'boolean' }).default(false),
-	createdAt: integer('created_at', { mode: 'timestamp_ms' })
+	currentPeriodStart: timestampTz('current_period_start'),
+	currentPeriodEnd: timestampTz('current_period_end'),
+	cancelAtPeriodEnd: boolean('cancel_at_period_end').default(false),
+	createdAt: timestampTz('created_at')
 		.notNull()
 		.$defaultFn(() => new Date()),
-	updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+	updatedAt: timestampTz('updated_at')
 		.notNull()
 		.$defaultFn(() => new Date())
 });

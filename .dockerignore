@@ -9,8 +9,7 @@ build
 !.env.example
 
 # Local data and tooling
-*.db
-*.db-journal
+.pglite
 .git
 .vscode
 .idea

@@ -19,6 +19,7 @@
     "test:unit": "vitest run",
     "test:acceptance": "playwright install chromium && playwright test",
     "test:criteria": "bun scripts/check-acceptance-criteria.ts",
+    "setup:database": "bun scripts/setup-database.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
@@ -44,13 +45,14 @@
     "vitest": "^5.0.5"
   },
   "dependencies": {
-    "@libsql/client": "^0.18.0",
+    "@electric-sql/pglite": "^0.5.14",
     "better-auth": "^1.7.14",
     "bits-ui": "^2.20.2",
     "chart.js": "^4.6.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.4",
     "mode-watcher": "^1.1.0",
+    "postgres": "^3.4.9",
     "resend": "^6.35.0",
     "stripe": "^23.1.0",
     "svelte-sonner": "^1.2.2",

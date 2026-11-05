@@ -1,18 +1,31 @@
 # JabStack
 
-A modern, full-stack starter template for personal projects. Built with SvelteKit, Turso, Better Auth, Stripe, and deployed on Fly.io.
+A modern, full-stack starter template for personal projects. Built with SvelteKit, PostgreSQL, Better Auth, Stripe, and deployed on Fly.io.
 
 ## Features
 
 - **Bun** - Fast JavaScript runtime and package manager
 - **SvelteKit 3** - Full-stack web framework with SSR/SSG/SPA support, on Vite 8
-- **Turso/SQLite** - LibSQL for production, SQLite for local development
+- **PostgreSQL** - Any Postgres host in production, PGlite (Postgres in WebAssembly) for local development and tests
 - **Better Auth** - Modern authentication with Google OAuth
 - **Stripe** - Helpers for subscription checkout, the billing portal and customers (no checkout route or webhook endpoint yet)
 - **Resend** - Transactional email templates (welcome, subscription confirmed, subscription cancelled)
 - **shadcn-svelte** - Beautiful UI components for dashboard
 - **Bits UI** - Headless components for marketing pages
 - **Fly.io** - Edge deployment with Docker
+
+<!-- scaffold:start -->
+## Choosing the Database
+
+A new project picks its database once, right after copying JabStack and running `bun install`:
+
+```bash
+bun run setup:database postgres   # PostgreSQL, the default
+bun run setup:database turso      # SQLite locally, Turso in production
+```
+
+The command keeps only the chosen database's code and docs, then deletes `templates/`, `.github/workflows/scaffold.yml`, itself and this section. Until then, the project is set up for PostgreSQL, and this README describes PostgreSQL.
+<!-- scaffold:end -->
 
 ## Quickstart
 
@@ -25,14 +38,14 @@ A modern, full-stack starter template for personal projects. Built with SvelteKi
 6. bun run dev
 ```
 
-`bun run db:migrate` creates `local.db` and its tables. The app runs at `http://localhost:5173` with SQLite out of the box. Auth and payments won't work until you configure the API keys in `.env`.
+`bun run db:migrate` creates a PGlite database in `.pglite/dev` and its tables, so you don't need a Postgres server to start. The app runs at `http://localhost:5173`. Auth and payments won't work until you configure the API keys in `.env`.
 
 ## Full Setup
 
 ### Prerequisites
 
 - [Bun](https://bun.sh) installed
-- [Turso CLI](https://docs.turso.tech/cli/installation) (optional, for production database)
+- A PostgreSQL database from any host (for production)
 - [Stripe CLI](https://docs.stripe.com/stripe-cli) (optional, for local webhook testing)
 - [Fly CLI](https://fly.io/docs/hands-on/install-flyctl/) (optional, for deployment)
 
@@ -43,6 +56,9 @@ Every variable is declared and validated in `src/env.ts`. The app refuses to sta
 | Variable | Required For | Get From |
 |----------|--------------|----------|
 | `PUBLIC_APP_URL` | Auth callbacks, email links | The URL you open the app at (`http://localhost:5173` locally) |
+| `DATABASE_URL` | Database | `file:.pglite/dev` locally. In production, your Postgres host's connection string |
+| `DATABASE_MIGRATION_URL` | Migrations, when `DATABASE_URL` is pooled (optional) | Your host's direct connection string |
+| `DATABASE_PREPARED_STATEMENTS` | Poolers that reject prepared statements (optional) | `false` for Supabase's pooler on port 6543. Defaults to `true` |
 | `BETTER_AUTH_SECRET` | Auth | `openssl rand -base64 32` |
 | `GOOGLE_CLIENT_ID` | Google OAuth | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
@@ -108,7 +124,7 @@ bun run db:studio    # Open Drizzle Studio
 bun run stripe:cli   # Forward Stripe webhooks to localhost:5173/api/stripe/webhook
 ```
 
-Unit tests live next to the code they cover (`src/**/*.test.ts`) and mock external services, so they run without API keys. `.env.test` supplies the one value Vitest needs when there's no `.env`.
+Unit tests live next to the code they cover (`src/**/*.test.ts`) and mock external services, so they run without API keys. `.env.test` supplies the one value Vitest needs when there's no `.env`. `src/lib/server/db/database.test.ts` runs the migrations and Better Auth against in-memory PGlite. Set `TEST_DATABASE_URL` to a `postgres://` URL to run it against a server.
 
 Acceptance tests live in `tests/acceptance/`. Each test's title starts with the ID of a criterion in `tests/acceptance/criteria.md`, such as `AC-03: ...`, and `test:criteria` fails if any criterion has no test. `test:acceptance` installs Chromium if needed, builds the app with placeholder settings and serves it on port 4173. Running it replaces `build/` with that test build.
 
@@ -146,7 +162,7 @@ signOut();
 ## Database
 
 ### Local Development
-Uses SQLite file (`local.db`) for simplicity.
+`DATABASE_URL=file:.pglite/dev` keeps the database in the `.pglite/dev` folder with [PGlite](https://pglite.dev), Postgres compiled to WebAssembly. Only one process can use the folder at a time, and PGlite doesn't lock it, so two processes can corrupt it. Stop `bun run dev` before running `bun run db:migrate` or `bun run db:studio`.
 
 ### Migrations
 Migrations are SQL files in `drizzle/` and are committed to git. After changing `src/lib/server/db/schema.ts`:
@@ -159,18 +175,11 @@ bun run db:migrate   # Apply it to the database in DATABASE_URL
 Commit the new files in `drizzle/` with the schema change. On Fly.io, the `release_command` in `fly.toml` runs `bun run db:migrate` against your production database before each release goes live.
 
 ### Production
-Uses [Turso](https://turso.tech) (libSQL) for edge-distributed database.
+Any Postgres host works, such as Neon, Supabase, Railway, AWS RDS or your own server. Set `DATABASE_URL` to its connection string, and add `?sslmode=require` if the host needs SSL. postgres.js reads the SSL setting from the URL.
 
-```bash
-# Create Turso database
-turso db create jabstack
+If the host offers a pooled and a direct connection string, use the pooled one for `DATABASE_URL` and the direct one for `DATABASE_MIGRATION_URL`. Neon's pooler accepts prepared statements. Supabase's pooler on port 6543 doesn't, so set `DATABASE_PREPARED_STATEMENTS=false` there.
 
-# Get connection URL
-turso db show jabstack --url
-
-# Get auth token
-turso db tokens create jabstack
-```
+Run the app in the Fly region closest to the database (`primary_region` in `fly.toml`).
 
 ## Deployment
 
@@ -189,7 +198,7 @@ The app reads its secrets when it starts. Set every variable in `src/env.ts` as 
 fly apps create your-app-name
 
 # Set secrets
-fly secrets set DATABASE_URL=libsql://... DATABASE_AUTH_TOKEN=...
+fly secrets set DATABASE_URL=postgres://... DATABASE_MIGRATION_URL=postgres://...
 fly secrets set BETTER_AUTH_SECRET=...
 fly secrets set GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=...
 fly secrets set STRIPE_SECRET_KEY=... STRIPE_WEBHOOK_SECRET=... PUBLIC_STRIPE_PUBLISHABLE_KEY=...
@@ -204,11 +213,10 @@ fly deploy
 JabStack includes MCP server configurations for AI-assisted development:
 
 - **Stripe MCP** - Query Stripe data, manage products/prices
-- **Turso MCP** - Query database, explore schema
 - **shadcn MCP** - Browse, search, and install shadcn-svelte components via natural language
 - **Svelte MCP** - Provides Svelte/SvelteKit documentation context and static analysis for better code generation
 
-See `.mcp/mcp.json` for configuration.
+See `.mcp/mcp.json` for configuration. There's no database MCP server, because each Postgres host has its own. Neon and Supabase both publish one you can add.
 
 ## Documentation
 

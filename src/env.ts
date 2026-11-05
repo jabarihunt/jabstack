@@ -22,12 +22,24 @@ export const variables = defineEnvVars({
 		description: 'The URL the app is served from, e.g. http://localhost:5173. Better Auth builds callback URLs from it.'
 	},
 	DATABASE_URL: {
-		schema: secret(z.string().min(1, 'DATABASE_URL is required'), ':memory:'),
-		description: 'libSQL URL: file:local.db locally, libsql://... for Turso.'
+		schema: secret(
+			z
+				.string()
+				.regex(
+					/^(postgres(ql)?:\/\/|file:|memory:\/\/$)/,
+					'DATABASE_URL must be a postgres:// URL, file:<folder> for PGlite, or memory://'
+				),
+			'memory://'
+		),
+		description: 'Postgres connection string from your host, or file:.pglite/dev for a local PGlite database.'
 	},
-	DATABASE_AUTH_TOKEN: {
+	DATABASE_MIGRATION_URL: {
 		schema: z.string().optional(),
-		description: 'Turso auth token. Leave empty for a local SQLite file.'
+		description: 'Optional direct (unpooled) connection string for migrations. Only drizzle.config.ts reads it.'
+	},
+	DATABASE_PREPARED_STATEMENTS: {
+		schema: z.stringbool('DATABASE_PREPARED_STATEMENTS must be true or false').default(true),
+		description: 'Set to false for poolers in transaction mode that reject prepared statements, such as Supabase on port 6543.'
 	},
 	BETTER_AUTH_SECRET: {
 		schema: secret(

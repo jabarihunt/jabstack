@@ -11,7 +11,7 @@ JabStack is a modern, full-stack starter template designed for personal projects
 | Runtime | Bun | Fast JavaScript runtime, package manager, and bundler |
 | Language | TypeScript | Type-safe JavaScript |
 | Framework | SvelteKit | Full-stack web framework with SSR/SSG/SPA support |
-| Database | Turso / SQLite | LibSQL for production, SQLite for local development |
+| Database | PostgreSQL / PGlite | Any Postgres host in production through postgres.js, PGlite for local development and tests |
 | ORM | Drizzle | Type-safe SQL ORM with excellent DX |
 | Auth | Better Auth | Modern auth library with OAuth support |
 | Payments | Stripe | Payment processing |
@@ -117,7 +117,7 @@ flowchart TB
     end
 
     subgraph External[External Services]
-        Turso[(Turso DB)]
+        Database[(PostgreSQL)]
         Google[Google OAuth]
         StripeAPI[Stripe API]
         ResendAPI[Resend API]
@@ -132,7 +132,7 @@ flowchart TB
     Marketing --> Components
     Dashboard --> Components
     API --> ServerLib
-    ServerLib --> Turso
+    ServerLib --> Database
     ServerLib --> Google
     ServerLib --> StripeAPI
     ServerLib --> ResendAPI
@@ -147,7 +147,7 @@ sequenceDiagram
     participant S as SvelteKit
     participant A as Better Auth
     participant G as Google OAuth
-    participant D as Turso DB
+    participant D as PostgreSQL
     participant St as Stripe
     participant E as Resend
 
@@ -250,14 +250,15 @@ erDiagram
     users ||--o{ subscriptions : has
 ```
 
-`users`, `sessions`, `accounts` and `verifications` are Better Auth's tables (`verifications` holds short-lived values such as OAuth state). Better Auth checks them against its expected schema at startup. Timestamps are stored as milliseconds.
+`users`, `sessions`, `accounts` and `verifications` are Better Auth's tables (`verifications` holds short-lived values such as OAuth state). Better Auth checks them against its expected schema at startup. Timestamps are `timestamp with time zone` columns.
 
 ## Environment Variables
 
 ```bash
 # Database
-DATABASE_URL=               # Turso database URL - libsql://...
-DATABASE_AUTH_TOKEN=        # Turso auth token
+DATABASE_URL=               # Postgres connection string, or file:.pglite/dev for PGlite
+DATABASE_MIGRATION_URL=     # Optional direct connection string for migrations
+DATABASE_PREPARED_STATEMENTS=  # Optional, default true. false for poolers that reject them
 
 # Auth
 BETTER_AUTH_SECRET=         # Random secret for session encryption
@@ -323,7 +324,7 @@ export const variables = defineEnvVars({
 		schema: z.url('PUBLIC_APP_URL must be a valid URL')
 	},
 	DATABASE_URL: {
-		schema: secret(z.string().min(1, 'DATABASE_URL is required'), ':memory:')
+		schema: secret(z.string().regex(/^(postgres(ql)?:\/\/|file:|memory:\/\/$)/), 'memory://')
 	},
 	STRIPE_SECRET_KEY: {
 		schema: secret(z.string().startsWith('sk_', 'STRIPE_SECRET_KEY must start with sk_'), 'sk_build_placeholder')
@@ -339,27 +340,28 @@ export const variables = defineEnvVars({
 
 ### 3. Database Setup with Drizzle
 
-Local SQLite file for development (`DATABASE_URL=file:local.db`), Turso for production:
+PGlite for development and tests (`DATABASE_URL=file:.pglite/dev`), any Postgres host in production. `DATABASE_URL` picks the driver:
 
 ```typescript
-// src/lib/server/db/index.ts
-import { drizzle } from 'drizzle-orm/libsql';
-import { createClient } from '@libsql/client';
-import { DATABASE_URL, DATABASE_AUTH_TOKEN } from '$app/env/private';
-import * as schema from './schema.js';
+// src/lib/server/db/index.ts (abridged)
+function createClient(url: string): Client {
+	if (/^postgres(ql)?:\/\//.test(url)) {
+		// SSL settings come from the URL, e.g. ?sslmode=require
+		return postgres(url, { prepare: DATABASE_PREPARED_STATEMENTS });
+	}
+	// file:<folder> or memory://: Postgres compiled to WebAssembly, in this process
+	return new PGlite(url.replace(/^file:/, ''));
+}
 
-const client = createClient({
-	url: DATABASE_URL,
-	authToken: DATABASE_AUTH_TOKEN || undefined
-});
-
-export const db = drizzle(client, { schema });
-
-// Re-export schema for convenience
-export * from './schema.js';
+// The build never queries, so it gets a postgres.js client that never connects
+export const db = building ? connect('postgres://build-placeholder@localhost/build') : connect(DATABASE_URL);
 ```
 
-`drizzle.config.ts` uses the `turso` dialect, which works with both a `file:` URL and a Turso URL plus auth token. Migrations are generated into `drizzle/` and committed.
+- `connect()` keeps each client on `globalThis`, so a Vite reload during development doesn't open a second PGlite on the same folder. PGlite doesn't lock its folder, and two processes using it can corrupt it.
+- On `sveltekit:shutdown`, which the Bun adapter emits after SIGTERM or SIGINT, the client closes so the process can exit.
+- `prepare: false` (`DATABASE_PREPARED_STATEMENTS=false`) is for poolers in transaction mode that reject prepared statements, such as Supabase's on port 6543.
+
+`drizzle.config.ts` uses the `postgresql` dialect. It connects with `DATABASE_MIGRATION_URL` if set, otherwise `DATABASE_URL`, through postgres.js for a `postgres://` URL or the `pglite` driver for a `file:` URL. Migrations are generated into `drizzle/` and committed.
 
 ### 4. Better Auth Configuration
 
@@ -372,7 +374,7 @@ import * as schema from './db/schema.js';
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
-    provider: 'sqlite',
+    provider: 'pg',
     schema,
     usePlural: true // tables are users, sessions, accounts, verifications
   }),
@@ -420,16 +422,15 @@ CMD ["bun", "./build/index.js"]
 - `fly.toml` passes `PUBLIC_APP_URL` as a build argument, because it's a static variable written into the build. The build needs no other variables.
 - `.dockerignore` keeps `.env`, `node_modules`, `.svelte-kit`, local databases and `.git` out of the build context.
 - Secrets come from `fly secrets set` and are read when the server starts.
-- `release_command = "bun run db:migrate"` in `fly.toml` applies migrations in a temporary Machine before each release goes live. It reads the same `DATABASE_URL` secret as the app. That's why the runtime image includes `drizzle/`, `drizzle.config.ts` and all of `node_modules` (drizzle-kit is a dev dependency).
+- `release_command = "bun run db:migrate"` in `fly.toml` applies migrations in a temporary Machine before each release goes live. It uses the app's secrets: `DATABASE_MIGRATION_URL` if set, otherwise `DATABASE_URL`. That's why the runtime image includes `drizzle/`, `drizzle.config.ts` and all of `node_modules` (drizzle-kit is a dev dependency).
 
 ## MCP Server Configurations
 
-`.mcp/mcp.json` runs four MCP servers with `bunx --bun`:
+`.mcp/mcp.json` runs three MCP servers with `bunx --bun`:
 
 | Server | Package | Uses |
 |--------|---------|------|
 | `stripe` | `@stripe/mcp --tools=all` | `STRIPE_SECRET_KEY`. All tools are enabled, so consider a restricted key |
-| `turso` | `@turso/mcp` | `DATABASE_URL`, `DATABASE_AUTH_TOKEN` |
 | `shadcn` | `shadcn@latest mcp` | Nothing |
 | `svelte` | `sv mcp` | Nothing |
 
@@ -470,13 +471,13 @@ All components use static placeholder data for flexibility across different proj
 
 ## Deployment Checklist
 
-1. Create Turso database and get credentials
+1. Create a PostgreSQL database on any host and copy its connection strings (pooled and direct, if it has both)
 2. Set up Google OAuth credentials, with `https://<your-app>.fly.dev/api/auth/callback/google` as an authorized redirect URI
 3. Create Stripe account and get API keys
 4. Create Resend account and get API key
 5. Set `app` and `PUBLIC_APP_URL` (under `[build.args]`) in `fly.toml`
 6. Create Fly.io app: `fly apps create <your-app>`
-7. Set secrets: `fly secrets set DATABASE_URL=... DATABASE_AUTH_TOKEN=...` and every other variable in `src/env.ts` except `PUBLIC_APP_URL`. The app won't start if one is missing.
+7. Set secrets: `fly secrets set DATABASE_URL=... DATABASE_MIGRATION_URL=...` and every other variable in `src/env.ts` except `PUBLIC_APP_URL`. The app won't start if one is missing.
 8. Deploy: `fly deploy`. Migrations run automatically before the release goes live.
 
 ## Next Steps After Setup
@@ -485,7 +486,7 @@ When starting a new project from JabStack:
 
 1. Clone the repository
 2. Update `package.json` with new project name
-3. Create new Turso database for the project
+3. Create a new PostgreSQL database for the project
 4. Update environment variables, then run `bun run db:migrate`
 5. Customize dashboard sidebar navigation in `app-sidebar.svelte`
 6. Modify database schema for project needs, then generate and commit a migration

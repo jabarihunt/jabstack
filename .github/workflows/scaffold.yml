@@ -1,0 +1,118 @@
+# Checks the JabStack scaffold itself: that each database choice sets up cleanly and
+# passes every check, and that the PostgreSQL code works against a real server.
+# `bun run setup:database` deletes this file, so new projects only keep ci.yml.
+name: Scaffold
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scaffold-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  setup:
+    name: setup:database ${{ matrix.database }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [postgres, turso]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.x
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Choose the database
+        run: bun run setup:database ${{ matrix.database }}
+
+      - name: No other database or scaffold files are left
+        run: |
+          if [ "${{ matrix.database }}" = turso ]; then other='pglite|postgres'; else other='turso|libsql'; fi
+          if git grep --untracked -nIiE "$other|scaffold:(start|end)|setup:database|setup-database" -- . ':!bun.lock'; then
+            echo "::error::Found leftovers from the scaffold or the other database"
+            exit 1
+          fi
+          for path in templates scripts/setup-database.ts .github/workflows/scaffold.yml; do
+            if [ -e "$path" ]; then echo "::error::$path still exists"; exit 1; fi
+          done
+
+      - name: Lockfile matches package.json
+        run: bun install --frozen-lockfile
+
+      - name: Type check
+        run: bun run check
+
+      - name: Unit tests
+        run: bun run test:unit
+
+      - name: Every acceptance criterion has a test
+        run: bun run test:criteria
+
+      - name: Install Playwright browser
+        run: bunx playwright install --with-deps chromium
+
+      - name: Acceptance tests
+        run: bun run test:acceptance
+
+  postgres-server:
+    name: Postgres server (prepared statements ${{ matrix.prepared-statements }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        prepared-statements: ['true', 'false']
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      ACCEPTANCE_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      DATABASE_PREPARED_STATEMENTS: ${{ matrix.prepared-statements }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.x
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Database test against the server
+        run: bunx vitest run src/lib/server/db
+
+      - name: Install Playwright browser
+        run: bunx playwright install --with-deps chromium
+
+      - name: Acceptance tests against the server
+        run: bun run test:acceptance
