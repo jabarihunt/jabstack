@@ -60,10 +60,19 @@ jobs:
             grep -q 'https://mcp.stripe.com' "$file" || { echo "::error::$file has no Stripe server"; exit 1; }
           done
           grep -q 'mcp__stripe__\*' .claude/settings.json || { echo "::error::Claude Code doesn't ask before Stripe calls"; exit 1; }
+          if [ "${{ matrix.database }}" = turso ]; then
+            grep -q 'mcp__turso__\*' .claude/settings.json || { echo "::error::Claude Code doesn't ask before Turso calls"; exit 1; }
+          fi
           bun run mcp:setup claude cursor vscode kiro codex gemini windsurf --agent-key > /dev/null
           for file in $files; do
             grep -q 'STRIPE_AGENT_API_KEY' "$file" || { echo "::error::$file doesn't use STRIPE_AGENT_API_KEY"; exit 1; }
           done
+          if grep -q 'mcp__stripe' .claude/settings.json; then
+            echo "::error::--agent-key left the Stripe ask rule, which would override the run's --allowedTools"; exit 1
+          fi
+          if STRIPE_AGENT_API_KEY=rk_live_example bun run mcp:setup claude --agent-key > /dev/null 2>&1; then
+            echo "::error::mcp:setup accepted a live-mode Stripe key"; exit 1
+          fi
 
       - name: Lockfile matches package.json
         run: bun install --frozen-lockfile

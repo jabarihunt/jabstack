@@ -13,7 +13,7 @@ index f2d4555..95405f0 100644
  .vscode
  .idea
 diff --git a/.env.example b/.env.example
-index 79eb9b3..9557b93 100644
+index 9e5b903..3cba3db 100644
 --- a/.env.example
 +++ b/.env.example
 @@ -2,22 +2,11 @@
@@ -61,7 +61,7 @@ index 0ffec8f..3290973 100644
  # IDE
  .idea
 diff --git a/AGENTS.md b/AGENTS.md
-index a9086d1..f53feab 100644
+index 0da201b..701ff55 100644
 --- a/AGENTS.md
 +++ b/AGENTS.md
 @@ -15,7 +15,7 @@ This copy hasn't chosen its database yet. It's set up for PostgreSQL, and this f
@@ -114,10 +114,10 @@ index a9086d1..f53feab 100644
  ## Notes
  
 -- `bun run mcp:setup <tool>` writes MCP config for claude, cursor, vscode, kiro, codex, gemini or windsurf from the server list in `scripts/mcp-setup.ts`: Stripe, shadcn and Svelte. There's no database server, because Postgres hosts each publish their own (Neon and Supabase do).
-+- `bun run mcp:setup <tool>` writes MCP config for claude, cursor, vscode, kiro, codex, gemini or windsurf from the server list in `scripts/mcp-setup.ts`: Stripe, Turso, shadcn and Svelte.
- - Stripe's MCP server only reaches the project's sandbox. `docs/stripe-agent-permissions.md` lists what agents may do there. When a task needs a permission it doesn't list, add the permission there in the same change and ask the person to grant it. Never call Stripe with `STRIPE_SECRET_KEY` or any other key to get around a missing permission. `STRIPE_AGENT_API_KEY` is only for MCP tools and never goes in `src/env.ts` or `.env`.
++- `bun run mcp:setup <tool>` writes MCP config for claude, cursor, vscode, kiro, codex, gemini or windsurf from the server list in `scripts/mcp-setup.ts`: Stripe, Turso, shadcn and Svelte. Turso's server asks before each call, and its OAuth grant should only reach the project's group.
+ - Stripe's MCP server only reaches the project's sandbox. `docs/stripe-agent-permissions.md` lists what agents may do there. When a task needs a permission it doesn't list, add the permission there in the same change and ask the person to grant it. Never call Stripe with `STRIPE_SECRET_KEY` or any other key to get around a missing permission. `STRIPE_AGENT_API_KEY` is only for MCP tools and never goes in `src/env.ts` or `.env`. Never commit config written by `mcp:setup --agent-key` (`ci.yml` checks).
 diff --git a/README.md b/README.md
-index a66ac3e..3162e19 100644
+index 491d5a5..9124568 100644
 --- a/README.md
 +++ b/README.md
 @@ -1,12 +1,12 @@
@@ -216,7 +216,7 @@ index a66ac3e..3162e19 100644
  `bun run mcp:setup <tool>` writes the MCP config for your AI coding tool: `claude` (Claude Code), `cursor`, `vscode` (GitHub Copilot), `kiro`, `codex`, `gemini` (Gemini CLI) or `windsurf`. Name several tools to set up each one. It configures these servers:
  
  - **Stripe MCP** - Stripe's hosted server at `https://mcp.stripe.com`, for reading and changing data in the project's Stripe sandbox
-+- **Turso MCP** - Turso's hosted server at `https://mcp.turso.ai/mcp`, for managing databases and running SQL. It signs in with OAuth, where you choose the organization or group it can reach
++- **Turso MCP** - Turso's hosted server at `https://mcp.turso.ai/mcp`, for managing databases and running SQL. It signs in with OAuth only, so unattended agents can't use it. Turso has no sandbox: on its consent page, grant only the project's group, read-only unless a task needs writes, and keep production databases in a separate group. The script makes tools ask before each Turso call, as it does for Stripe
  - **shadcn MCP** - Browse, search, and install shadcn-svelte components via natural language
  - **Svelte MCP** - Provides Svelte/SvelteKit documentation context and static analysis for better code generation
  
@@ -226,7 +226,7 @@ index a66ac3e..3162e19 100644
  ### Stripe
  
 diff --git a/plans/jabstack-architecture.md b/plans/jabstack-architecture.md
-index ad7dc0b..a5bda9d 100644
+index 2a058e4..4dd926b 100644
 --- a/plans/jabstack-architecture.md
 +++ b/plans/jabstack-architecture.md
 @@ -11,7 +11,7 @@ JabStack is a modern, full-stack starter template designed for personal projects
@@ -238,7 +238,7 @@ index ad7dc0b..a5bda9d 100644
  | ORM | Drizzle | Type-safe SQL ORM with excellent DX |
  | Auth | Better Auth | Modern auth library with OAuth support |
  | Payments | Stripe | Payment processing |
-@@ -119,7 +119,7 @@ flowchart TB
+@@ -120,7 +120,7 @@ flowchart TB
      end
  
      subgraph External[External Services]
@@ -247,7 +247,7 @@ index ad7dc0b..a5bda9d 100644
          Google[Google OAuth]
          StripeAPI[Stripe API]
          ResendAPI[Resend API]
-@@ -134,7 +134,7 @@ flowchart TB
+@@ -135,7 +135,7 @@ flowchart TB
      Marketing --> Components
      Dashboard --> Components
      API --> ServerLib
@@ -256,7 +256,7 @@ index ad7dc0b..a5bda9d 100644
      ServerLib --> Google
      ServerLib --> StripeAPI
      ServerLib --> ResendAPI
-@@ -149,7 +149,7 @@ sequenceDiagram
+@@ -150,7 +150,7 @@ sequenceDiagram
      participant S as SvelteKit
      participant A as Better Auth
      participant G as Google OAuth
@@ -265,7 +265,7 @@ index ad7dc0b..a5bda9d 100644
      participant St as Stripe
      participant E as Resend
  
-@@ -252,15 +252,14 @@ erDiagram
+@@ -253,15 +253,14 @@ erDiagram
      users ||--o{ subscriptions : has
  ```
  
@@ -284,7 +284,7 @@ index ad7dc0b..a5bda9d 100644
  
  # Auth
  BETTER_AUTH_SECRET=         # Random secret for session encryption
-@@ -326,7 +325,7 @@ export const variables = defineEnvVars({
+@@ -327,7 +326,7 @@ export const variables = defineEnvVars({
  		schema: z.url('PUBLIC_APP_URL must be a valid URL')
  	},
  	DATABASE_URL: {
@@ -292,8 +292,8 @@ index ad7dc0b..a5bda9d 100644
 +		schema: secret(z.string().min(1, 'DATABASE_URL is required'), ':memory:')
  	},
  	STRIPE_SECRET_KEY: {
- 		schema: secret(z.string().startsWith('sk_', 'STRIPE_SECRET_KEY must start with sk_'), 'sk_build_placeholder')
-@@ -342,28 +341,27 @@ export const variables = defineEnvVars({
+ 		// sk_ or a restricted rk_ key. Live keys are refused under `bun run dev`.
+@@ -344,28 +343,27 @@ export const variables = defineEnvVars({
  
  ### 3. Database Setup with Drizzle
  
@@ -338,7 +338,7 @@ index ad7dc0b..a5bda9d 100644
  
  ### 4. Better Auth Configuration
  
-@@ -376,7 +374,7 @@ import * as schema from './db/schema.js';
+@@ -378,7 +376,7 @@ import * as schema from './db/schema.js';
  
  export const auth = betterAuth({
    database: drizzleAdapter(db, {
@@ -347,7 +347,7 @@ index ad7dc0b..a5bda9d 100644
      schema,
      usePlural: true // tables are users, sessions, accounts, verifications
    }),
-@@ -424,7 +422,7 @@ CMD ["bun", "./build/index.js"]
+@@ -426,7 +424,7 @@ CMD ["bun", "./build/index.js"]
  - `fly.toml` passes `PUBLIC_APP_URL` as a build argument, because it's a static variable written into the build. The build needs no other variables.
  - `.dockerignore` keeps `.env`, `node_modules`, `.svelte-kit`, local databases and `.git` out of the build context.
  - Secrets come from `fly secrets set` and are read when the server starts.
@@ -356,15 +356,15 @@ index ad7dc0b..a5bda9d 100644
  
  ## MCP Server Configurations
  
-@@ -433,6 +431,7 @@ Each AI tool reads MCP servers from its own file, in its own format. `scripts/mc
+@@ -435,6 +433,7 @@ Each AI tool reads MCP servers from its own file, in its own format. `scripts/mc
  | Server | Connection | Authentication |
  |--------|------------|----------------|
  | `stripe` | Stripe's hosted server at `https://mcp.stripe.com` | OAuth to the project's sandbox, or with `--agent-key` a sandbox Agent API key from `STRIPE_AGENT_API_KEY` |
-+| `turso` | Turso's hosted server at `https://mcp.turso.ai/mcp` | OAuth, limited to the organization or group you choose |
++| `turso` | Turso's hosted server at `https://mcp.turso.ai/mcp` | OAuth only, limited to the organization or group you choose. Asks before each call, like `stripe` |
  | `shadcn` | `bunx --bun shadcn@latest mcp` | Nothing |
  | `svelte` | `bunx --bun sv mcp` | Nothing |
  
-@@ -477,13 +476,13 @@ All components use static placeholder data for flexibility across different proj
+@@ -481,13 +480,13 @@ All components use static placeholder data for flexibility across different proj
  
  ## Deployment Checklist
  
@@ -380,7 +380,7 @@ index ad7dc0b..a5bda9d 100644
  8. Deploy: `fly deploy`. Migrations run automatically before the release goes live.
  
  ## Next Steps After Setup
-@@ -492,7 +491,7 @@ When starting a new project from JabStack:
+@@ -496,7 +495,7 @@ When starting a new project from JabStack:
  
  1. Clone the repository
  2. Update `package.json` with new project name
@@ -408,21 +408,22 @@ index 86970a8..66f1728 100644
  	GOOGLE_CLIENT_ID: 'acceptance-test-google-client-id',
  	GOOGLE_CLIENT_SECRET: 'acceptance-test-google-client-secret',
 diff --git a/scripts/mcp-setup.ts b/scripts/mcp-setup.ts
-index bd19a5d..8b31e68 100644
+index 9555f88..26e038f 100644
 --- a/scripts/mcp-setup.ts
 +++ b/scripts/mcp-setup.ts
-@@ -30,6 +30,9 @@ const servers: Record<string, Server> = {
+@@ -34,6 +34,10 @@ const servers: Record<string, Server> = {
  		agentKeyEnv: 'STRIPE_AGENT_API_KEY',
  		askBeforeEachCall: true
  	},
-+	// Turso's hosted server. It signs in with OAuth, limited to the organization or group
-+	// you choose on Turso's consent page.
-+	turso: { url: 'https://mcp.turso.ai/mcp' },
++	// Turso's hosted server. It signs in with OAuth only, limited to the organization or
++	// group you choose on Turso's consent page. Turso has no sandbox, so grant only the
++	// project's group, read-only unless a task needs writes.
++	turso: { url: 'https://mcp.turso.ai/mcp', askBeforeEachCall: true },
  	shadcn: { command: 'bunx', args: ['--bun', 'shadcn@latest', 'mcp'] },
  	svelte: { command: 'bunx', args: ['--bun', 'sv', 'mcp'] }
  };
 diff --git a/src/env.ts b/src/env.ts
-index bfae78a..a2661b8 100644
+index 8a1c767..4f37880 100644
 --- a/src/env.ts
 +++ b/src/env.ts
 @@ -22,24 +22,12 @@ export const variables = defineEnvVars({

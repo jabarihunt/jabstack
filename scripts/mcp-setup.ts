@@ -10,10 +10,14 @@
 // the script also makes the tool ask before every Stripe tool call.
 //
 // --agent-key is for agents that run without a person, for example in CI. Stripe then
-// gets a sandbox Agent API key from the STRIPE_AGENT_API_KEY environment variable, and
-// the script leaves out the approval settings, because nobody is there to answer. The
-// key's permissions are the limit (docs/stripe-agent-permissions.md). Don't commit the
-// files this mode writes. Run the script again without --agent-key to switch back.
+// signs in with a sandbox Agent API key from the STRIPE_AGENT_API_KEY environment
+// variable, and the script refuses a live-mode key. It also leaves out the Stripe
+// approval settings: Claude Code's ask rule, for one, would override the run's own
+// approval. Unattended runs still refuse tool calls that need approval, so the run must
+// allow Stripe's tools itself, for example claude -p "..." --allowedTools "mcp__stripe__*".
+// The key's permissions are then the limit (docs/stripe-agent-permissions.md). Never
+// commit the files this mode writes (ci.yml fails if you do). Run the script again
+// without --agent-key to switch back.
 //
 // Existing files are updated in place: only these servers' entries are replaced.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -77,8 +81,10 @@ type Options = {
 const authHeaders = (server: Remote, { agentKey, envRef }: Options) =>
 	agentKey && server.agentKeyEnv ? { headers: { Authorization: `Bearer ${envRef(server.agentKeyEnv)}` } } : {};
 
-// Asks before each call unless an agent runs alone (--agent-key)
-const asks = (server: Remote, { agentKey }: Options) => !!server.askBeforeEachCall && !agentKey;
+// Asks before each call, except for a server that uses the Agent API key in --agent-key
+// mode, where the unattended run approves its tools instead
+const asks = (server: Server, { agentKey }: Options) =>
+	isRemote(server) && !!server.askBeforeEachCall && !(agentKey && server.agentKeyEnv);
 
 // Sets each server's entry under `key` in a JSON file
 function writeServers(path: string, key: string, entry: (server: Server) => Record<string, unknown>) {
@@ -100,8 +106,28 @@ type Tool = {
 const dollarBraces = (name: string) => `\${${name}}`;
 const envColon = (name: string) => `\${env:${name}}`;
 
-const signIn = (how: string) => ({ agentKey }: Options) =>
-	agentKey ? ['Set STRIPE_AGENT_API_KEY in the environment the tool runs in.'] : [how];
+// The remote servers, which sign in with OAuth unless --agent-key gives them a key
+const remoteNames = Object.keys(servers).filter((name) => isRemote(servers[name]));
+const oauthOnlyNames = remoteNames.filter((name) => !(servers[name] as Remote).agentKeyEnv);
+const list = (names: string[]) => names.join(' and ');
+
+// `how` says how to sign in with OAuth, with {servers} for the server names. In
+// --agent-key mode, `allow` says how the unattended run allows Stripe's tools.
+const signIn =
+	(how: string, allow = "with the tool's own option for approving MCP tools") =>
+	({ agentKey }: Options) =>
+		agentKey
+			? [
+					'Set STRIPE_AGENT_API_KEY in the environment the tool runs in.',
+					`Unattended runs refuse tool calls that need approval. Allow Stripe's tools in the run ${allow}.`,
+					...(oauthOnlyNames.length
+						? [`${list(oauthOnlyNames)} only signs in with OAuth, so unattended runs can't use it.`]
+						: [])
+				]
+			: [how.replace('{servers}', list(remoteNames))];
+
+// A note that only applies when a person approves tool calls
+const interactiveOnly = ({ agentKey }: Options, note: string) => (agentKey ? [] : [note]);
 
 const tools: Record<string, Tool> = {
 	claude: {
@@ -114,10 +140,14 @@ const tools: Record<string, Tool> = {
 			];
 			// Ask rules win over allow rules, so a broad allow rule can't skip the prompt
 			const settings = '.claude/settings.json';
-			if (options.agentKey && !existsSync(settings)) return files;
+			const rules = Object.keys(servers)
+				.filter((name) => asks(servers[name], options))
+				.map((name) => `mcp__${name}__*`);
+			if (rules.length === 0 && !existsSync(settings)) return files;
+			const ours = (rule: string) =>
+				Object.keys(servers).some((name) => rule === `mcp__${name}` || rule.startsWith(`mcp__${name}__`));
 			updateJson(settings, (data) => {
-				const ask: string[] = (data.permissions?.ask ?? []).filter((rule: string) => !rule.startsWith('mcp__stripe'));
-				if (asks(servers.stripe as Remote, options)) ask.push('mcp__stripe__*');
+				const ask: string[] = [...(data.permissions?.ask ?? []).filter((rule: string) => !ours(rule)), ...rules];
 				data.permissions = { ...data.permissions, ask };
 				if (ask.length === 0) delete data.permissions.ask;
 				if (Object.keys(data.permissions).length === 0) delete data.permissions;
@@ -126,7 +156,7 @@ const tools: Record<string, Tool> = {
 		},
 		notes: (options) => [
 			'Start Claude Code here and approve the project MCP servers when it asks.',
-			...signIn('Run /mcp and authenticate stripe.')(options)
+			...signIn('Run /mcp and authenticate {servers}.', 'with --allowedTools "mcp__stripe__*"')(options)
 		]
 	},
 	cursor: {
@@ -138,8 +168,8 @@ const tools: Record<string, Tool> = {
 		],
 		notes: (options) => [
 			"Turn the servers on in Cursor's MCP settings.",
-			...signIn('Sign in to stripe there.')(options),
-			"Approval is a personal setting in Cursor: don't let it run Stripe tools without asking."
+			...signIn('Sign in to {servers} there.')(options),
+			...interactiveOnly(options, "Approval is a personal setting in Cursor: don't let it run Stripe tools without asking.")
 		]
 	},
 	vscode: {
@@ -153,8 +183,8 @@ const tools: Record<string, Tool> = {
 		],
 		notes: (options) => [
 			'Start the servers from .vscode/mcp.json.',
-			...signIn('Sign in to stripe when VS Code asks.')(options),
-			'Approval is a personal setting in VS Code: don\'t choose "Always allow" for Stripe tools.'
+			...signIn('Sign in to {servers} when VS Code asks.')(options),
+			...interactiveOnly(options, 'Approval is a personal setting in VS Code: don\'t choose "Always allow" for Stripe tools.')
 		]
 	},
 	kiro: {
@@ -178,9 +208,8 @@ const tools: Record<string, Tool> = {
 		},
 		notes: (options) => [
 			'Kiro now loads MCP servers in this workspace (kiroAgent.configureMCP in .vscode/settings.json).',
-			...(options.agentKey
-				? ['Set STRIPE_AGENT_API_KEY, and approve the variable when Kiro asks to use it.']
-				: ['Sign in to stripe from the MCP Servers view in the Kiro panel.'])
+			...signIn('Sign in to {servers} from the MCP Servers view in the Kiro panel.')(options),
+			...(options.agentKey ? ['Kiro also asks once before it uses STRIPE_AGENT_API_KEY: approve the variable.'] : [])
 		]
 	},
 	codex: {
@@ -206,12 +235,20 @@ const tools: Record<string, Tool> = {
 			}
 			block.push(end);
 
-			// Keep whatever else the file holds, outside this script's block
+			// Keep whatever else the file holds, outside this script's block. A block with a
+			// missing or extra marker can't be replaced safely, so stop instead.
 			const existing = existsSync(path) ? readFileSync(path, 'utf8') : '';
+			const count = (marker: string) => existing.split(marker).length - 1;
 			const start = existing.indexOf(begin);
 			const stop = existing.indexOf(end);
+			if (count(begin) > 1 || count(end) > 1 || count(begin) !== count(end) || stop < start) {
+				fail(
+					`${path} has a damaged mcp:setup block. It needs one "${begin}" line followed by one ` +
+						`"${end}" line, or neither. Fix the file, then run this again.`
+				);
+			}
 			const before = start === -1 ? existing : existing.slice(0, start);
-			const after = start === -1 || stop === -1 ? '' : existing.slice(stop + end.length);
+			const after = start === -1 ? '' : existing.slice(stop + end.length);
 			for (const name of Object.keys(servers)) {
 				if ((before + after).includes(`[mcp_servers.${name}]`)) {
 					fail(`${path} already defines [mcp_servers.${name}] outside this script's block. Remove it, then run this again.`);
@@ -228,7 +265,10 @@ const tools: Record<string, Tool> = {
 		},
 		notes: (options) => [
 			'Codex reads .codex/config.toml only in a project you trust.',
-			...signIn('Run `codex mcp login stripe` to sign in.')(options)
+			...signIn(
+				'Run `codex mcp login <server>` to sign in to {servers}.',
+				'with an approval setting your Codex version honors in `codex exec`. Some versions cancel every MCP call there, so test it first'
+			)(options)
 		]
 	},
 	gemini: {
@@ -244,7 +284,10 @@ const tools: Record<string, Tool> = {
 					: local(server)
 			)
 		],
-		notes: signIn('Gemini CLI asks you to sign in to stripe when it first connects (or run /mcp auth stripe).')
+		notes: signIn(
+			'Gemini CLI asks you to sign in to {servers} when it first connects (or run /mcp auth <server>).',
+			'with a user policy rule: mcpName = "stripe", decision = "allow"'
+		)
 	},
 	windsurf: {
 		envRef: envColon,
@@ -259,8 +302,8 @@ const tools: Record<string, Tool> = {
 		},
 		notes: (options) => [
 			'Windsurf has no project MCP file. Add the servers above to ~/.codeium/windsurf/mcp_config.json.',
-			...signIn('Sign in to stripe when Windsurf asks.')(options),
-			'Approval is a personal setting in Windsurf: keep Stripe tools asking before they run.'
+			...signIn('Sign in to {servers} when Windsurf asks.')(options),
+			...interactiveOnly(options, 'Approval is a personal setting in Windsurf: keep Stripe tools asking before they run.')
 		]
 	}
 };
@@ -276,6 +319,19 @@ if (chosen.length === 0 || unknown.length > 0) {
 	);
 }
 
+// Agents never get a live-mode key. The files only refer to the variable, so this can
+// only check the value when the variable is set while the script runs.
+if (agentKey) {
+	for (const server of Object.values(servers)) {
+		if (isRemote(server) && server.agentKeyEnv && process.env[server.agentKeyEnv]?.includes('_live_')) {
+			fail(
+				`${server.agentKeyEnv} holds a live-mode key. Agents only ever get sandbox keys: ` +
+					"create an Agent API key in the project's Stripe sandbox."
+			);
+		}
+	}
+}
+
 for (const name of chosen) {
 	const tool = tools[name];
 	const options = { agentKey, envRef: tool.envRef };
@@ -287,8 +343,8 @@ for (const name of chosen) {
 
 console.log(
 	agentKey
-		? '\nStripe signs in with the Agent API key in STRIPE_AGENT_API_KEY, and these files add no approval ' +
-				"prompts for it. Use a sandbox key, and don't commit these files."
+		? '\nStripe signs in with the sandbox Agent API key in STRIPE_AGENT_API_KEY. ' +
+				"Never commit these files: ci.yml fails on committed MCP config that uses the key."
 		: "\nWhen Stripe asks, grant access to the project's sandbox only, never live mode."
 );
 console.log('What agents may do in Stripe: docs/stripe-agent-permissions.md');

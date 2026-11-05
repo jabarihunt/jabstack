@@ -62,7 +62,7 @@ Every variable is declared and validated in `src/env.ts`. The app refuses to sta
 | `BETTER_AUTH_SECRET` | Auth | `openssl rand -base64 32` |
 | `GOOGLE_CLIENT_ID` | Google OAuth | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) |
-| `STRIPE_SECRET_KEY` | Payments | [Stripe Dashboard](https://dashboard.stripe.com/apikeys) |
+| `STRIPE_SECRET_KEY` | Payments | [Stripe Dashboard](https://dashboard.stripe.com/apikeys). A restricted key (`rk_`) with write access to Customers, Checkout Sessions and Customer portal is safer than a secret key (`sk_`). The dev server refuses live-mode keys |
 | `STRIPE_WEBHOOK_SECRET` | Webhooks (once you add the endpoint) | `bun run stripe:cli` prints it |
 | `PUBLIC_STRIPE_PUBLISHABLE_KEY` | Payments | [Stripe Dashboard](https://dashboard.stripe.com/apikeys) |
 | `RESEND_API_KEY` | Email | [Resend Dashboard](https://resend.com/api-keys) |
@@ -223,24 +223,26 @@ The server list is in `scripts/mcp-setup.ts`. The files it writes hold no secret
 Agents only ever get access to a Stripe sandbox, never live mode. [`docs/stripe-agent-permissions.md`](docs/stripe-agent-permissions.md) lists what they may do there and how to change it.
 
 - **In your editor:** the first time the tool connects to Stripe, it opens Stripe's consent page. Grant access to the project's sandbox only, with the permissions in that file.
-- **Agents that run alone, such as in CI:** create an Agent API key in the project's sandbox with those permissions. Put it in the `STRIPE_AGENT_API_KEY` environment variable and run `bun run mcp:setup <tool> --agent-key` before the agent starts. Don't commit the files this mode writes.
+- **Agents that run alone, such as in CI:** create an Agent API key in the project's sandbox with those permissions. Put it in the `STRIPE_AGENT_API_KEY` environment variable and run `bun run mcp:setup <tool> --agent-key` before the agent starts. The script refuses a live-mode key.
 - **The key:** `STRIPE_AGENT_API_KEY` is separate from the app's `STRIPE_SECRET_KEY`. Set it in your shell or in CI secrets, not in `.env`, which most MCP tools don't read.
-- **Approval:** the script makes Claude Code, Kiro, Codex and Gemini CLI ask before each Stripe tool call. In Cursor, VS Code and Windsurf, approval is a personal setting, so keep Stripe tools asking there. `--agent-key` leaves the prompts out, because nobody is there to answer them. The key's permissions are the limit.
+- **Approval:** the script makes Claude Code, Kiro, Codex and Gemini CLI ask before each Stripe tool call. In Cursor, VS Code and Windsurf, approval is a personal setting, so keep Stripe tools asking there.
+- **Approval in unattended runs:** these tools refuse any tool call that needs approval when nobody is there to give it. `--agent-key` removes the script's Stripe prompts, but the run itself must still allow Stripe's tools, for example with `--allowedTools "mcp__stripe__*"` for Claude Code. The key's permissions are then the limit. Other tools need their own option, and some versions of `codex exec` cancel every MCP call, so test a run before relying on it.
+- **Never commit the files `--agent-key` writes.** They would remove the prompts for everyone. `ci.yml` fails if committed MCP config uses `STRIPE_AGENT_API_KEY`.
 
-In GitHub Actions, for example:
+A GitHub Actions example. The key is set for the whole step, so the script can check that it isn't a live key:
 
 ```yaml
-- name: Set up MCP for the agent
-  run: bun run mcp:setup claude --agent-key
 - name: Run the agent
-  run: ...
   env:
     STRIPE_AGENT_API_KEY: ${{ secrets.STRIPE_AGENT_API_KEY }}
+  run: |
+    bun run mcp:setup claude --agent-key
+    claude -p "..." --allowedTools "mcp__stripe__*"
 ```
 
 ## Documentation
 
-- [`AGENTS.md`](AGENTS.md) - Instructions for AI coding agents (read by Claude Code through `CLAUDE.md`, and by Cursor, Windsurf, Kiro and GitHub Copilot)
+- [`AGENTS.md`](AGENTS.md) - Instructions for AI coding agents, read by Codex, Cursor, Windsurf, Kiro and GitHub Copilot. `CLAUDE.md` and `GEMINI.md` import it for Claude Code and Gemini CLI
 - [`plans/jabstack-architecture.md`](plans/jabstack-architecture.md) - Architecture details
 - [`docs/stripe-agent-permissions.md`](docs/stripe-agent-permissions.md) - What AI agents may do in Stripe
 

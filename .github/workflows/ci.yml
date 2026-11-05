@@ -20,6 +20,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # `bun run mcp:setup <tool> --agent-key` writes MCP config for unattended runs, which
+      # drops the prompt before Stripe tool calls. Committed, it would drop it for everyone.
+      # This searches the commit, so a later job that runs --agent-key isn't affected.
+      - name: Committed MCP config doesn't use the Stripe agent key
+        run: |
+          if git grep -n STRIPE_AGENT_API_KEY HEAD -- .mcp.json .claude .cursor .vscode .kiro .codex .gemini; then
+            echo "::error::Committed MCP config uses STRIPE_AGENT_API_KEY. Run bun run mcp:setup <tool> without --agent-key and commit that instead."
+            exit 1
+          fi
+
       # The Bun adapter requires Bun 1.4 or newer
       - uses: oven-sh/setup-bun@v2
         with:

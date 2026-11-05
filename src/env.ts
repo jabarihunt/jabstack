@@ -1,5 +1,5 @@
 import { defineEnvVars } from '@sveltejs/kit/env';
-import { building } from '$app/env';
+import { building, dev } from '$app/env';
 import { z } from 'zod';
 
 // Environment variables, imported from '$app/env/private' and '$app/env/public'.
@@ -58,10 +58,17 @@ export const variables = defineEnvVars({
 	},
 	STRIPE_SECRET_KEY: {
 		schema: secret(
-			z.string().startsWith('sk_', 'STRIPE_SECRET_KEY must start with sk_'),
+			z
+				.string()
+				.regex(/^(sk|rk)_/, 'STRIPE_SECRET_KEY must be a secret key (sk_) or a restricted key (rk_)')
+				// Local .env files are readable by AI agents, so they only ever hold sandbox keys
+				.refine(
+					(key) => !(dev && key.includes('_live_')),
+					'STRIPE_SECRET_KEY is a live-mode key. Use a sandbox key for local development.'
+				),
 			'sk_build_placeholder'
 		),
-		description: 'Stripe secret key.'
+		description: 'Stripe key for the app. A restricted key (rk_) with only the permissions the app needs is safer than a secret key (sk_).'
 	},
 	STRIPE_WEBHOOK_SECRET: {
 		schema: secret(

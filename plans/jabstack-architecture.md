@@ -94,7 +94,8 @@ jabstack/
 ├── bun.lock                           # Bun lock file
 ├── README.md
 ├── AGENTS.md                          # Instructions for AI coding agents
-└── CLAUDE.md                          # Imports AGENTS.md for Claude Code
+├── CLAUDE.md                          # Imports AGENTS.md for Claude Code
+└── GEMINI.md                          # Imports AGENTS.md for Gemini CLI
 ```
 
 ## Architecture Diagram
@@ -268,7 +269,7 @@ GOOGLE_CLIENT_ID=           # Google OAuth client ID
 GOOGLE_CLIENT_SECRET=       # Google OAuth client secret
 
 # Stripe
-STRIPE_SECRET_KEY=          # Stripe secret key
+STRIPE_SECRET_KEY=          # Stripe secret (sk_) or restricted (rk_) key
 STRIPE_WEBHOOK_SECRET=      # Stripe webhook signing secret
 PUBLIC_STRIPE_PUBLISHABLE_KEY=  # Stripe publishable key - client-safe
 
@@ -329,7 +330,8 @@ export const variables = defineEnvVars({
 		schema: secret(z.string().regex(/^(postgres(ql)?:\/\/|file:|memory:\/\/$)/), 'memory://')
 	},
 	STRIPE_SECRET_KEY: {
-		schema: secret(z.string().startsWith('sk_', 'STRIPE_SECRET_KEY must start with sk_'), 'sk_build_placeholder')
+		// sk_ or a restricted rk_ key. Live keys are refused under `bun run dev`.
+		schema: secret(z.string().regex(/^(sk|rk)_/), 'sk_build_placeholder')
 	}
 	// ... Better Auth, Google, Stripe webhook and publishable key, Resend
 });
@@ -437,7 +439,9 @@ Each AI tool reads MCP servers from its own file, in its own format. `scripts/mc
 | `svelte` | `bunx --bun sv mcp` | Nothing |
 
 - Which Stripe tools work depends on the OAuth grant or the key's permissions. `docs/stripe-agent-permissions.md` records what they should be.
-- Where the tool allows it, the script makes it ask before each Stripe tool call: an `ask` rule in `.claude/settings.json`, an empty `autoApprove` for Kiro, `default_tools_approval_mode = "prompt"` for Codex and `trust: false` for Gemini CLI. `--agent-key` leaves these out for agents that run without a person.
+- Where the tool allows it, the script makes it ask before each Stripe tool call: an `ask` rule in `.claude/settings.json`, an empty `autoApprove` for Kiro, `default_tools_approval_mode = "prompt"` for Codex and `trust: false` for Gemini CLI.
+- `--agent-key` leaves the Stripe prompts out, because Claude Code's `ask` rule would override an unattended run's own approval. It never adds an allow setting. Unattended runs refuse tool calls that need approval, so each run allows Stripe's tools itself, for example `claude -p "..." --allowedTools "mcp__stripe__*"`. Files written this way must never be committed, and `ci.yml` fails if committed MCP config uses `STRIPE_AGENT_API_KEY`.
+- With `STRIPE_AGENT_API_KEY` set, `--agent-key` refuses a live-mode key. The app's `src/env.ts` refuses a live `STRIPE_SECRET_KEY` under `bun run dev`.
 - `STRIPE_AGENT_API_KEY` is separate from the app's `STRIPE_SECRET_KEY`, so agents never get the app's key.
 
 ## UI Library Strategy
