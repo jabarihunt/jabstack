@@ -52,6 +52,19 @@ jobs:
             if [ -e "$path" ]; then echo "::error::$path still exists"; exit 1; fi
           done
 
+      - name: mcp:setup writes every tool's config
+        run: |
+          files='.mcp.json .cursor/mcp.json .vscode/mcp.json .kiro/settings/mcp.json .codex/config.toml .gemini/settings.json'
+          bun run mcp:setup claude cursor vscode kiro codex gemini windsurf > /dev/null
+          for file in $files; do
+            grep -q 'https://mcp.stripe.com' "$file" || { echo "::error::$file has no Stripe server"; exit 1; }
+          done
+          grep -q 'mcp__stripe__\*' .claude/settings.json || { echo "::error::Claude Code doesn't ask before Stripe calls"; exit 1; }
+          bun run mcp:setup claude cursor vscode kiro codex gemini windsurf --agent-key > /dev/null
+          for file in $files; do
+            grep -q 'STRIPE_AGENT_API_KEY' "$file" || { echo "::error::$file doesn't use STRIPE_AGENT_API_KEY"; exit 1; }
+          done
+
       - name: Lockfile matches package.json
         run: bun install --frozen-lockfile
 

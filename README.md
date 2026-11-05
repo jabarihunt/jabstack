@@ -210,18 +210,39 @@ fly deploy
 
 ## MCP Servers
 
-JabStack includes MCP server configurations for AI-assisted development:
+`bun run mcp:setup <tool>` writes the MCP config for your AI coding tool: `claude` (Claude Code), `cursor`, `vscode` (GitHub Copilot), `kiro`, `codex`, `gemini` (Gemini CLI) or `windsurf`. Name several tools to set up each one. It configures these servers:
 
-- **Stripe MCP** - Query Stripe data, manage products/prices
+- **Stripe MCP** - Stripe's hosted server at `https://mcp.stripe.com`, for reading and changing data in the project's Stripe sandbox
 - **shadcn MCP** - Browse, search, and install shadcn-svelte components via natural language
 - **Svelte MCP** - Provides Svelte/SvelteKit documentation context and static analysis for better code generation
 
-See `.mcp/mcp.json` for configuration. There's no database MCP server, because each Postgres host has its own. Neon and Supabase both publish one you can add.
+The server list is in `scripts/mcp-setup.ts`. The files it writes hold no secrets, so commit the ones your team uses. There's no database MCP server, because each Postgres host has its own. Neon and Supabase both publish one you can add.
+
+### Stripe
+
+Agents only ever get access to a Stripe sandbox, never live mode. [`docs/stripe-agent-permissions.md`](docs/stripe-agent-permissions.md) lists what they may do there and how to change it.
+
+- **In your editor:** the first time the tool connects to Stripe, it opens Stripe's consent page. Grant access to the project's sandbox only, with the permissions in that file.
+- **Agents that run alone, such as in CI:** create an Agent API key in the project's sandbox with those permissions. Put it in the `STRIPE_AGENT_API_KEY` environment variable and run `bun run mcp:setup <tool> --agent-key` before the agent starts. Don't commit the files this mode writes.
+- **The key:** `STRIPE_AGENT_API_KEY` is separate from the app's `STRIPE_SECRET_KEY`. Set it in your shell or in CI secrets, not in `.env`, which most MCP tools don't read.
+- **Approval:** the script makes Claude Code, Kiro, Codex and Gemini CLI ask before each Stripe tool call. In Cursor, VS Code and Windsurf, approval is a personal setting, so keep Stripe tools asking there. `--agent-key` leaves the prompts out, because nobody is there to answer them. The key's permissions are the limit.
+
+In GitHub Actions, for example:
+
+```yaml
+- name: Set up MCP for the agent
+  run: bun run mcp:setup claude --agent-key
+- name: Run the agent
+  run: ...
+  env:
+    STRIPE_AGENT_API_KEY: ${{ secrets.STRIPE_AGENT_API_KEY }}
+```
 
 ## Documentation
 
 - [`AGENTS.md`](AGENTS.md) - Instructions for AI coding agents (read by Claude Code through `CLAUDE.md`, and by Cursor, Windsurf, Kiro and GitHub Copilot)
 - [`plans/jabstack-architecture.md`](plans/jabstack-architecture.md) - Architecture details
+- [`docs/stripe-agent-permissions.md`](docs/stripe-agent-permissions.md) - What AI agents may do in Stripe
 
 ## License
 

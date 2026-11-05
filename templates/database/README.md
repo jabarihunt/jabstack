@@ -5,7 +5,7 @@ JabStack is set up for PostgreSQL. `bun run setup:database turso` (in `scripts/s
 `turso/` holds what differs from the PostgreSQL version:
 
 - `files/` holds whole files, at the paths they're copied to. The setup deletes `drizzle/` and `src/lib/components/icons/postgres-icon.svelte`, then copies these over the project.
-- `shared-files.patch` changes the files both databases share: docs, `.env.example`, ignore files, `.mcp/mcp.json`, `src/env.ts`, `src/lib/server/auth.ts`, `playwright.config.ts` and the home page.
+- `shared-files.patch` changes the files both databases share: docs, `.env.example`, ignore files, the MCP server list in `scripts/mcp-setup.ts`, `src/env.ts`, `src/lib/server/auth.ts`, `playwright.config.ts` and the home page.
 - The setup also swaps the packages (`postgres` and `@electric-sql/pglite` for `@libsql/client`).
 
 ## Keeping Turso up to date

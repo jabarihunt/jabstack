@@ -128,3 +128,4 @@ if (existsSync('.pglite') && choice === 'turso') {
 	console.log('- .pglite/ holds local PostgreSQL data that Turso doesn\'t use. Delete it when you no longer need it.');
 }
 console.log('- Run `bun run db:migrate` to create the local database, then commit the changes.');
+console.log('- Run `bun run mcp:setup <tool>` to set up MCP servers for your AI tool.');

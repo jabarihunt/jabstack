@@ -42,6 +42,7 @@ bun run db:migrate   # Apply migrations to DATABASE_MIGRATION_URL, or DATABASE_U
 bun run db:push      # Push schema without a migration (prototyping only)
 bun run db:studio    # Open Drizzle Studio
 bun run stripe:cli   # Forward Stripe webhooks to localhost:5173/api/stripe/webhook
+bun run mcp:setup <tool>  # Write the MCP config for an AI tool (see Notes)
 ```
 
 Before finishing a change, run `bun run check`, `bun run test:unit`, `bun run test:criteria` and `bun run test:acceptance`. `check` should report 0 errors and 0 warnings. CI runs the same steps on every push and pull request.
@@ -69,7 +70,8 @@ src/
     └── api/auth/         # Better Auth handler for /api/auth/*
 drizzle/                  # Migrations (generated, committed)
 tests/acceptance/         # Playwright tests and criteria.md (the acceptance criteria)
-scripts/                  # check-acceptance-criteria.ts (bun run test:criteria)
+scripts/                  # check-acceptance-criteria.ts (test:criteria), mcp-setup.ts (mcp:setup)
+docs/                     # stripe-agent-permissions.md
 ```
 
 ## Conventions
@@ -90,11 +92,11 @@ scripts/                  # check-acceptance-criteria.ts (bun run test:criteria)
 
 ### Server code and secrets
 - Code in `src/lib/server/` is server-only. Never import it from client components.
-- Every environment variable is declared in `src/env.ts` with `defineEnvVars` and a Zod schema. Import private ones from `$app/env/private` and public ones from `$app/env/public`. `$env/*` is deprecated.
+- Every environment variable the app reads is declared in `src/env.ts` with `defineEnvVars` and a Zod schema. Import private ones from `$app/env/private` and public ones from `$app/env/public`. `$env/*` is deprecated.
 - Variables are read when the app starts, so values set with `fly secrets set` take effect. Only `PUBLIC_APP_URL` is `static: true` (written into the build from the `fly.toml` build argument).
 - Invalid or missing values stop the app from starting. While building, secrets are optional and fall back to placeholders, because the Docker build has no secrets. When adding a secret, wrap its schema in `secret(...)` the same way.
 - Don't read `process.env` in app code. `drizzle.config.ts` is the exception, because drizzle-kit runs outside SvelteKit.
-- `.env.example` lists every variable. Never commit `.env`. `.env.test` is committed and holds only non-secret values for tests.
+- `.env.example` lists every variable the app reads. Never commit `.env`. `.env.test` is committed and holds only non-secret values for tests. Local `.env` files only ever hold Stripe sandbox keys.
 - `EMAIL_FROM` sets the email sender. It defaults to Resend's test sender, which only delivers to your own Resend address.
 - Validate API input with Zod.
 
@@ -155,9 +157,7 @@ Create `src/routes/<name>/+page.svelte` with Bits UI and custom Tailwind styling
 The tests run against a production build served by `vite preview` on port 4173, using placeholder settings from `playwright.config.ts` and their own PGlite folder (`.pglite/acceptance`). They must never call Google, Stripe or Resend. Running them replaces `build/` with a test build.
 
 ### Add a unit test
-Put unit tests next to the code they cover as `<name>.test.ts`. Mock `$app/env/private`, `$app/env/public` and external SDKs with `vi.mock`, as `src/lib/server/email.test.ts` and `stripe.test.ts` do. Tests never call real services. Every test must make at least one `expect` call (`requireAssertions` is on).
-
-`src/lib/server/db/database.test.ts` runs the migrations and Better Auth against in-memory PGlite. Set `TEST_DATABASE_URL` to a `postgres://` URL to run it against a server.
+Put unit tests next to the code they cover as `<name>.test.ts`. Mock `$app/env/private`, `$app/env/public` and external SDKs with `vi.mock`, as `src/lib/server/email.test.ts` and `stripe.test.ts` do. Tests never call real services. Every test must make at least one `expect` call (`requireAssertions` is on). `src/lib/server/db/database.test.ts` runs the migrations and Better Auth against in-memory PGlite. Set `TEST_DATABASE_URL` to a `postgres://` URL to run it against a server.
 
 ### Add an API endpoint
 Create `src/routes/api/<name>/+server.ts`, export method handlers (`GET`, `POST`), validate input with Zod and return `Response.json(...)`. SvelteKit 3 deprecates its `json()` helper. There's no Stripe webhook endpoint yet. `stripe:cli` expects one at `src/routes/api/stripe/webhook/+server.ts`.
@@ -204,4 +204,5 @@ The Bun adapter assumes requests arrived over HTTPS, which is true behind Fly's 
 
 ## Notes
 
-- `.mcp/mcp.json` configures Stripe, shadcn and Svelte MCP servers. It has no database server, because Postgres hosts each publish their own (Neon and Supabase do).
+- `bun run mcp:setup <tool>` writes MCP config for claude, cursor, vscode, kiro, codex, gemini or windsurf from the server list in `scripts/mcp-setup.ts`: Stripe, shadcn and Svelte. There's no database server, because Postgres hosts each publish their own (Neon and Supabase do).
+- Stripe's MCP server only reaches the project's sandbox. `docs/stripe-agent-permissions.md` lists what agents may do there. When a task needs a permission it doesn't list, add the permission there in the same change and ask the person to grant it. Never call Stripe with `STRIPE_SECRET_KEY` or any other key to get around a missing permission. `STRIPE_AGENT_API_KEY` is only for MCP tools and never goes in `src/env.ts` or `.env`.

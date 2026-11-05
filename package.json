@@ -20,6 +20,7 @@
     "test:acceptance": "playwright install chromium && playwright test",
     "test:criteria": "bun scripts/check-acceptance-criteria.ts",
     "setup:database": "bun scripts/setup-database.ts",
+    "mcp:setup": "bun scripts/mcp-setup.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",

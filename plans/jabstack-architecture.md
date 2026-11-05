@@ -77,6 +77,8 @@ jabstack/
 ├── .github/workflows/ci.yml           # CI: type check, unit tests, criteria check, acceptance tests
 ├── tests/acceptance/                  # Playwright acceptance tests and criteria.md
 ├── scripts/check-acceptance-criteria.ts  # Checks every criterion in criteria.md has a test
+├── scripts/mcp-setup.ts               # Writes the MCP server config for each AI tool
+├── docs/stripe-agent-permissions.md   # What AI agents may do in Stripe
 ├── playwright.config.ts               # Playwright: builds the app and serves it on port 4173
 ├── .dockerignore                      # Keeps .env, node_modules and local databases out of the image
 ├── .gitignore
@@ -426,13 +428,17 @@ CMD ["bun", "./build/index.js"]
 
 ## MCP Server Configurations
 
-`.mcp/mcp.json` runs three MCP servers with `bunx --bun`:
+Each AI tool reads MCP servers from its own file, in its own format. `scripts/mcp-setup.ts` holds one list of servers, and `bun run mcp:setup <tool>` writes it for that tool: `.mcp.json` and `.claude/settings.json` for Claude Code, `.cursor/mcp.json`, `.vscode/mcp.json`, `.kiro/settings/mcp.json`, `.codex/config.toml` or `.gemini/settings.json`. Windsurf has no project file, so the script prints its config. Existing files are updated in place.
 
-| Server | Package | Uses |
-|--------|---------|------|
-| `stripe` | `@stripe/mcp --tools=all` | `STRIPE_SECRET_KEY`. All tools are enabled, so consider a restricted key |
-| `shadcn` | `shadcn@latest mcp` | Nothing |
-| `svelte` | `sv mcp` | Nothing |
+| Server | Connection | Authentication |
+|--------|------------|----------------|
+| `stripe` | Stripe's hosted server at `https://mcp.stripe.com` | OAuth to the project's sandbox, or with `--agent-key` a sandbox Agent API key from `STRIPE_AGENT_API_KEY` |
+| `shadcn` | `bunx --bun shadcn@latest mcp` | Nothing |
+| `svelte` | `bunx --bun sv mcp` | Nothing |
+
+- Which Stripe tools work depends on the OAuth grant or the key's permissions. `docs/stripe-agent-permissions.md` records what they should be.
+- Where the tool allows it, the script makes it ask before each Stripe tool call: an `ask` rule in `.claude/settings.json`, an empty `autoApprove` for Kiro, `default_tools_approval_mode = "prompt"` for Codex and `trust: false` for Gemini CLI. `--agent-key` leaves these out for agents that run without a person.
+- `STRIPE_AGENT_API_KEY` is separate from the app's `STRIPE_SECRET_KEY`, so agents never get the app's key.
 
 ## UI Library Strategy
 

@@ -45,7 +45,7 @@ index 79eb9b3..9557b93 100644
  # Authentication - Better Auth
  # Generate with: openssl rand -base64 32
 diff --git a/.gitignore b/.gitignore
-index 1bd6d28..2294af1 100644
+index 0ffec8f..3290973 100644
 --- a/.gitignore
 +++ b/.gitignore
 @@ -22,8 +22,9 @@ Thumbs.db
@@ -60,27 +60,8 @@ index 1bd6d28..2294af1 100644
  
  # IDE
  .idea
-diff --git a/.mcp/mcp.json b/.mcp/mcp.json
-index 47a38c1..9f1349b 100644
---- a/.mcp/mcp.json
-+++ b/.mcp/mcp.json
-@@ -7,6 +7,14 @@
-         "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY}"
-       }
-     },
-+    "turso": {
-+      "command": "bunx",
-+      "args": ["--bun", "@turso/mcp"],
-+      "env": {
-+        "TURSO_DATABASE_URL": "${DATABASE_URL}",
-+        "TURSO_AUTH_TOKEN": "${DATABASE_AUTH_TOKEN}"
-+      }
-+    },
-     "shadcn": {
-       "command": "bunx",
-       "args": ["--bun", "shadcn@latest", "mcp"]
 diff --git a/AGENTS.md b/AGENTS.md
-index 92627ec..503dded 100644
+index a9086d1..f53feab 100644
 --- a/AGENTS.md
 +++ b/AGENTS.md
 @@ -15,7 +15,7 @@ This copy hasn't chosen its database yet. It's set up for PostgreSQL, and this f
@@ -101,7 +82,7 @@ index 92627ec..503dded 100644
  bun run db:push      # Push schema without a migration (prototyping only)
  bun run db:studio    # Open Drizzle Studio
  bun run stripe:cli   # Forward Stripe webhooks to localhost:5173/api/stripe/webhook
-@@ -99,11 +99,9 @@ scripts/                  # check-acceptance-criteria.ts (bun run test:criteria)
+@@ -101,11 +101,9 @@ docs/                     # stripe-agent-permissions.md
  - Validate API input with Zod.
  
  ### Database
@@ -115,7 +96,7 @@ index 92627ec..503dded 100644
  - After a schema change, run `bun run db:generate` and `bun run db:migrate`, then commit the new files in `drizzle/`. On Fly.io, `release_command` in `fly.toml` runs `bun run db:migrate` before each release.
  - `users`, `sessions`, `accounts` and `verifications` belong to Better Auth, which checks them against its expected schema at startup. After upgrading Better Auth or adding a Better Auth plugin, generate a reference copy and compare: `bunx auth generate --config src/lib/server/auth.ts --output /tmp/auth-schema.ts`.
  
-@@ -152,12 +150,12 @@ Create `src/routes/<name>/+page.svelte` with Bits UI and custom Tailwind styling
+@@ -154,10 +152,10 @@ Create `src/routes/<name>/+page.svelte` with Bits UI and custom Tailwind styling
  3. Test what a user sees and does: use `page.getByRole`, `getByText` and URLs, not CSS classes.
  4. Run `bun run test:criteria` and `bun run test:acceptance`. Run one criterion with `bun run test:acceptance --grep "AC-NN:"`.
  
@@ -123,21 +104,20 @@ index 92627ec..503dded 100644
 +The tests run against a production build served by `vite preview` on port 4173, using placeholder settings from `playwright.config.ts` and a separate `acceptance-test.db`. They must never call Google, Stripe or Resend. Running them replaces `build/` with a test build.
  
  ### Add a unit test
- Put unit tests next to the code they cover as `<name>.test.ts`. Mock `$app/env/private`, `$app/env/public` and external SDKs with `vi.mock`, as `src/lib/server/email.test.ts` and `stripe.test.ts` do. Tests never call real services. Every test must make at least one `expect` call (`requireAssertions` is on).
- 
--`src/lib/server/db/database.test.ts` runs the migrations and Better Auth against in-memory PGlite. Set `TEST_DATABASE_URL` to a `postgres://` URL to run it against a server.
-+`src/lib/server/db/database.test.ts` runs the migrations and Better Auth against an in-memory SQLite database.
+-Put unit tests next to the code they cover as `<name>.test.ts`. Mock `$app/env/private`, `$app/env/public` and external SDKs with `vi.mock`, as `src/lib/server/email.test.ts` and `stripe.test.ts` do. Tests never call real services. Every test must make at least one `expect` call (`requireAssertions` is on). `src/lib/server/db/database.test.ts` runs the migrations and Better Auth against in-memory PGlite. Set `TEST_DATABASE_URL` to a `postgres://` URL to run it against a server.
++Put unit tests next to the code they cover as `<name>.test.ts`. Mock `$app/env/private`, `$app/env/public` and external SDKs with `vi.mock`, as `src/lib/server/email.test.ts` and `stripe.test.ts` do. Tests never call real services. Every test must make at least one `expect` call (`requireAssertions` is on). `src/lib/server/db/database.test.ts` runs the migrations and Better Auth against an in-memory SQLite database.
  
  ### Add an API endpoint
  Create `src/routes/api/<name>/+server.ts`, export method handlers (`GET`, `POST`), validate input with Zod and return `Response.json(...)`. SvelteKit 3 deprecates its `json()` helper. There's no Stripe webhook endpoint yet. `stripe:cli` expects one at `src/routes/api/stripe/webhook/+server.ts`.
-@@ -204,4 +202,4 @@ The Bun adapter assumes requests arrived over HTTPS, which is true behind Fly's
+@@ -204,5 +202,5 @@ The Bun adapter assumes requests arrived over HTTPS, which is true behind Fly's
  
  ## Notes
  
--- `.mcp/mcp.json` configures Stripe, shadcn and Svelte MCP servers. It has no database server, because Postgres hosts each publish their own (Neon and Supabase do).
-+- `.mcp/mcp.json` configures Stripe, Turso, shadcn and Svelte MCP servers.
+-- `bun run mcp:setup <tool>` writes MCP config for claude, cursor, vscode, kiro, codex, gemini or windsurf from the server list in `scripts/mcp-setup.ts`: Stripe, shadcn and Svelte. There's no database server, because Postgres hosts each publish their own (Neon and Supabase do).
++- `bun run mcp:setup <tool>` writes MCP config for claude, cursor, vscode, kiro, codex, gemini or windsurf from the server list in `scripts/mcp-setup.ts`: Stripe, Turso, shadcn and Svelte.
+ - Stripe's MCP server only reaches the project's sandbox. `docs/stripe-agent-permissions.md` lists what agents may do there. When a task needs a permission it doesn't list, add the permission there in the same change and ask the person to grant it. Never call Stripe with `STRIPE_SECRET_KEY` or any other key to get around a missing permission. `STRIPE_AGENT_API_KEY` is only for MCP tools and never goes in `src/env.ts` or `.env`.
 diff --git a/README.md b/README.md
-index 553b76a..c95f11e 100644
+index a66ac3e..3162e19 100644
 --- a/README.md
 +++ b/README.md
 @@ -1,12 +1,12 @@
@@ -233,20 +213,20 @@ index 553b76a..c95f11e 100644
  fly secrets set GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=...
  fly secrets set STRIPE_SECRET_KEY=... STRIPE_WEBHOOK_SECRET=... PUBLIC_STRIPE_PUBLISHABLE_KEY=...
 @@ -213,10 +221,11 @@ fly deploy
- JabStack includes MCP server configurations for AI-assisted development:
+ `bun run mcp:setup <tool>` writes the MCP config for your AI coding tool: `claude` (Claude Code), `cursor`, `vscode` (GitHub Copilot), `kiro`, `codex`, `gemini` (Gemini CLI) or `windsurf`. Name several tools to set up each one. It configures these servers:
  
- - **Stripe MCP** - Query Stripe data, manage products/prices
-+- **Turso MCP** - Query database, explore schema
+ - **Stripe MCP** - Stripe's hosted server at `https://mcp.stripe.com`, for reading and changing data in the project's Stripe sandbox
++- **Turso MCP** - Turso's hosted server at `https://mcp.turso.ai/mcp`, for managing databases and running SQL. It signs in with OAuth, where you choose the organization or group it can reach
  - **shadcn MCP** - Browse, search, and install shadcn-svelte components via natural language
  - **Svelte MCP** - Provides Svelte/SvelteKit documentation context and static analysis for better code generation
  
--See `.mcp/mcp.json` for configuration. There's no database MCP server, because each Postgres host has its own. Neon and Supabase both publish one you can add.
-+See `.mcp/mcp.json` for configuration.
+-The server list is in `scripts/mcp-setup.ts`. The files it writes hold no secrets, so commit the ones your team uses. There's no database MCP server, because each Postgres host has its own. Neon and Supabase both publish one you can add.
++The server list is in `scripts/mcp-setup.ts`. The files it writes hold no secrets, so commit the ones your team uses.
  
- ## Documentation
+ ### Stripe
  
 diff --git a/plans/jabstack-architecture.md b/plans/jabstack-architecture.md
-index 8ae6fb3..4fc0059 100644
+index ad7dc0b..a5bda9d 100644
 --- a/plans/jabstack-architecture.md
 +++ b/plans/jabstack-architecture.md
 @@ -11,7 +11,7 @@ JabStack is a modern, full-stack starter template designed for personal projects
@@ -258,7 +238,7 @@ index 8ae6fb3..4fc0059 100644
  | ORM | Drizzle | Type-safe SQL ORM with excellent DX |
  | Auth | Better Auth | Modern auth library with OAuth support |
  | Payments | Stripe | Payment processing |
-@@ -117,7 +117,7 @@ flowchart TB
+@@ -119,7 +119,7 @@ flowchart TB
      end
  
      subgraph External[External Services]
@@ -267,7 +247,7 @@ index 8ae6fb3..4fc0059 100644
          Google[Google OAuth]
          StripeAPI[Stripe API]
          ResendAPI[Resend API]
-@@ -132,7 +132,7 @@ flowchart TB
+@@ -134,7 +134,7 @@ flowchart TB
      Marketing --> Components
      Dashboard --> Components
      API --> ServerLib
@@ -276,7 +256,7 @@ index 8ae6fb3..4fc0059 100644
      ServerLib --> Google
      ServerLib --> StripeAPI
      ServerLib --> ResendAPI
-@@ -147,7 +147,7 @@ sequenceDiagram
+@@ -149,7 +149,7 @@ sequenceDiagram
      participant S as SvelteKit
      participant A as Better Auth
      participant G as Google OAuth
@@ -285,7 +265,7 @@ index 8ae6fb3..4fc0059 100644
      participant St as Stripe
      participant E as Resend
  
-@@ -250,15 +250,14 @@ erDiagram
+@@ -252,15 +252,14 @@ erDiagram
      users ||--o{ subscriptions : has
  ```
  
@@ -304,7 +284,7 @@ index 8ae6fb3..4fc0059 100644
  
  # Auth
  BETTER_AUTH_SECRET=         # Random secret for session encryption
-@@ -324,7 +323,7 @@ export const variables = defineEnvVars({
+@@ -326,7 +325,7 @@ export const variables = defineEnvVars({
  		schema: z.url('PUBLIC_APP_URL must be a valid URL')
  	},
  	DATABASE_URL: {
@@ -313,7 +293,7 @@ index 8ae6fb3..4fc0059 100644
  	},
  	STRIPE_SECRET_KEY: {
  		schema: secret(z.string().startsWith('sk_', 'STRIPE_SECRET_KEY must start with sk_'), 'sk_build_placeholder')
-@@ -340,28 +339,27 @@ export const variables = defineEnvVars({
+@@ -342,28 +341,27 @@ export const variables = defineEnvVars({
  
  ### 3. Database Setup with Drizzle
  
@@ -358,7 +338,7 @@ index 8ae6fb3..4fc0059 100644
  
  ### 4. Better Auth Configuration
  
-@@ -374,7 +372,7 @@ import * as schema from './db/schema.js';
+@@ -376,7 +374,7 @@ import * as schema from './db/schema.js';
  
  export const auth = betterAuth({
    database: drizzleAdapter(db, {
@@ -367,7 +347,7 @@ index 8ae6fb3..4fc0059 100644
      schema,
      usePlural: true // tables are users, sessions, accounts, verifications
    }),
-@@ -422,15 +420,16 @@ CMD ["bun", "./build/index.js"]
+@@ -424,7 +422,7 @@ CMD ["bun", "./build/index.js"]
  - `fly.toml` passes `PUBLIC_APP_URL` as a build argument, because it's a static variable written into the build. The build needs no other variables.
  - `.dockerignore` keeps `.env`, `node_modules`, `.svelte-kit`, local databases and `.git` out of the build context.
  - Secrets come from `fly secrets set` and are read when the server starts.
@@ -376,17 +356,15 @@ index 8ae6fb3..4fc0059 100644
  
  ## MCP Server Configurations
  
--`.mcp/mcp.json` runs three MCP servers with `bunx --bun`:
-+`.mcp/mcp.json` runs four MCP servers with `bunx --bun`:
+@@ -433,6 +431,7 @@ Each AI tool reads MCP servers from its own file, in its own format. `scripts/mc
+ | Server | Connection | Authentication |
+ |--------|------------|----------------|
+ | `stripe` | Stripe's hosted server at `https://mcp.stripe.com` | OAuth to the project's sandbox, or with `--agent-key` a sandbox Agent API key from `STRIPE_AGENT_API_KEY` |
++| `turso` | Turso's hosted server at `https://mcp.turso.ai/mcp` | OAuth, limited to the organization or group you choose |
+ | `shadcn` | `bunx --bun shadcn@latest mcp` | Nothing |
+ | `svelte` | `bunx --bun sv mcp` | Nothing |
  
- | Server | Package | Uses |
- |--------|---------|------|
- | `stripe` | `@stripe/mcp --tools=all` | `STRIPE_SECRET_KEY`. All tools are enabled, so consider a restricted key |
-+| `turso` | `@turso/mcp` | `DATABASE_URL`, `DATABASE_AUTH_TOKEN` |
- | `shadcn` | `shadcn@latest mcp` | Nothing |
- | `svelte` | `sv mcp` | Nothing |
- 
-@@ -471,13 +470,13 @@ All components use static placeholder data for flexibility across different proj
+@@ -477,13 +476,13 @@ All components use static placeholder data for flexibility across different proj
  
  ## Deployment Checklist
  
@@ -402,7 +380,7 @@ index 8ae6fb3..4fc0059 100644
  8. Deploy: `fly deploy`. Migrations run automatically before the release goes live.
  
  ## Next Steps After Setup
-@@ -486,7 +485,7 @@ When starting a new project from JabStack:
+@@ -492,7 +491,7 @@ When starting a new project from JabStack:
  
  1. Clone the repository
  2. Update `package.json` with new project name
@@ -429,6 +407,20 @@ index 86970a8..66f1728 100644
  	BETTER_AUTH_SECRET: 'acceptance-test-secret-not-used-in-production',
  	GOOGLE_CLIENT_ID: 'acceptance-test-google-client-id',
  	GOOGLE_CLIENT_SECRET: 'acceptance-test-google-client-secret',
+diff --git a/scripts/mcp-setup.ts b/scripts/mcp-setup.ts
+index bd19a5d..8b31e68 100644
+--- a/scripts/mcp-setup.ts
++++ b/scripts/mcp-setup.ts
+@@ -30,6 +30,9 @@ const servers: Record<string, Server> = {
+ 		agentKeyEnv: 'STRIPE_AGENT_API_KEY',
+ 		askBeforeEachCall: true
+ 	},
++	// Turso's hosted server. It signs in with OAuth, limited to the organization or group
++	// you choose on Turso's consent page.
++	turso: { url: 'https://mcp.turso.ai/mcp' },
+ 	shadcn: { command: 'bunx', args: ['--bun', 'shadcn@latest', 'mcp'] },
+ 	svelte: { command: 'bunx', args: ['--bun', 'sv', 'mcp'] }
+ };
 diff --git a/src/env.ts b/src/env.ts
 index bfae78a..a2661b8 100644
 --- a/src/env.ts
